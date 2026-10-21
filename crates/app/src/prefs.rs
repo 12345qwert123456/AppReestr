@@ -105,6 +105,25 @@ pub fn show(settings: &Settings, root: &adw::ApplicationWindow, sender: &Compone
         });
     });
 
+    // For when an ordinary uninstall is refused.
+    let danger = adw::PreferencesGroup::builder()
+        .title(tr("Danger Zone"))
+        .description(tr("For when an ordinary uninstall is refused."))
+        .build();
+    let force = adw::ActionRow::builder()
+        .title(tr("Force Remove a Package…"))
+        .subtitle(tr("Ignores dependencies and protection. The system may stop working."))
+        .activatable(true)
+        .build();
+    force.add_suffix(&ui::row_hint("go-next-symbolic"));
+    let (s, d) = (sender.clone(), dialog.clone());
+    force.connect_activated(move |_| {
+        d.close();
+        s.input(Msg::DangerZone);
+    });
+    danger.add(&force);
+    page.add(&danger);
+
     dialog.add(&page);
     dialog.present(Some(root));
 }

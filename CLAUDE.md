@@ -11,6 +11,7 @@ cargo build                                   # debug build of the whole workspa
 cargo run -p appreestr                        # run the GUI from the tree
 cargo run -p appreestr-dump -- --timings --all  # what is listed and why (App/Console/System + reasons)
 cargo run -p appreestr-dump -- --plan PKG...    # removal plan + protection for pacman packages (read-only)
+cargo run -p appreestr-dump -- --force-plan PKG...  # what the Danger Zone would do (read-only)
 cargo run -p appreestr-dump -- --leftovers APP-ID   # leftovers in $HOME (APP-ID like pacman:firefox)
 cargo test --workspace
 cargo test -p appreestr-core classify::tests::console_and_system   # single test
@@ -68,6 +69,17 @@ The scan takes about 0.4 s in release. The UI shows `cache.rs`'s snapshot (postc
 - **polkit.** The session's own agent is used. The fallback (`pkttyagent` on a PTY, password dialog in the app) starts only when pkexec reports "No authentication agent found". The `polkit_agents` rule list (which includes `noctalia`) only feeds protection and the pre-start hint.
 - **Helper path.** The policy action `io.github.appreestr.AppReestr.uninstall` is bound to `/usr/lib/appreestr/appreestr-helper`. Debug builds fall back to `target/debug/appreestr-helper`, or `$APPREESTR_HELPER`, when it is not installed. Release builds bake in `APPREESTR_HELPER_PATH` and `APPREESTR_LOCALEDIR` from the Makefile.
 
+## Administrator session, bulk removal, Danger Zone
+
+- **Restart as Administrator** (`crates/app/src/elevate.rs`, `removal::launch_elevated`). The window starts `pkexec <current exe> NAME=VALUE… --notify-ready`.
+  - pkexec drops the environment, so the display and session variables listed in `elevate::PASS` travel as arguments. The Wayland socket and session bus are passed as full paths and `XDG_RUNTIME_DIR` is deliberately not passed (root must not write there).
+  - The copy sets `GSETTINGS_BACKEND=memory`, runs with `NON_UNIQUE`, and prints `READY` when its window is mapped; the original quits on that line.
+  - Who started it comes from `PKEXEC_UID`/`SUDO_UID` (`sysroot::invoking_user`). `SysRoot::host()` then uses that user's home and ignores root's XDG variables.
+  - Files written in the user's home go through `sysroot::as_user` (`setfsuid`), so they are user-owned and a planted symlink cannot redirect root. User-level steps (trash via `gio trash`, `flatpak --user`) run as that user (`removal::user_command`).
+  - As root, `removal::privileged` runs the helper directly with a cleared environment. Protection is still enforced by the helper. The polkit action `…run-as-admin` is bound to `/usr/bin/appreestr`; the Makefile rewrites the path.
+- **Bulk removal.** Selection mode lives in `row::Selection`, shared by the window and the rows. It updates the check buttons that are on screen in place, so the list keeps its scroll position. `uninstall::request_many` plans each selected app alone first and skips the protected ones, then plans the union. `Planned` holds `items` and `skipped`.
+- **Danger Zone** (`crates/app/src/danger.rs`). `plan::plan_force` simulates `pacman -Rdd` (`NO_DEPS | NO_DEP_VERSION`) and fills `RemovalPlan::broken`. The helper command `force-remove-packages` re-plans the same way, checks the fingerprint and runs `pacman -R[s][n]dd`. It is the only helper command that ignores protection, and it is reachable only from the confirmation dialog that requires typing the package name. Never route an ordinary uninstall through it.
+
 ## i18n
 
 - Use `appreestr_core::i18n::{tr, trf, trn}` with English literals. `trf` substitutes `{}` in order. `trn` handles plurals; Russian has 3 forms.
@@ -96,6 +108,8 @@ APPREESTR_SCREENSHOT_DELAY=2500 target/debug/appreestr
 ```
 
 - Actions: `details:<id>`, `search:<text>`, `uninstall:<id>`, `system`, `console`, `preferences`.
+- If the user has AppReestr running, a second copy hands over to it over D-Bus and exits at once with no screenshot. Run it as `dbus-run-session -- env … target/debug/appreestr` so it gets its own bus.
+- More actions: `select:<id>,…`, `bulk:<id>,…` (select and open the uninstall dialog), `danger`, `force:<package>`, `admin`.
 - Use a scratch `XDG_CONFIG_HOME` so the user's settings are not touched. Put `gtk-enable-animations=0` in its `gtk-4.0/settings.ini`.
 
 ## End-to-end removal test

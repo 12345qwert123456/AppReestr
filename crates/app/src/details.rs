@@ -227,6 +227,27 @@ pub fn build(app: &App) -> DetailsPage {
     }
     page_content.add(&why);
 
+    // Packages can be removed by force, ignoring dependencies and protection.
+    let packages: Vec<&Installation> = app.installs.iter().filter(|i| i.source.is_pacman()).collect();
+    if !packages.is_empty() {
+        let danger = adw::PreferencesGroup::builder()
+            .title(tr("Danger Zone"))
+            .description(tr("For when an ordinary uninstall is refused."))
+            .build();
+        for inst in packages {
+            let r = adw::ActionRow::builder()
+                .title(format::escape(&trf("Force Remove “{}”…", &[&inst.unit_name])))
+                .subtitle(tr("Ignores dependencies and protection. The system may stop working."))
+                .activatable(true)
+                .build();
+            r.add_suffix(&ui::row_hint("go-next-symbolic"));
+            r.set_action_name(Some("win.force-remove"));
+            r.set_action_target_value(Some(&glib::Variant::from(inst.unit_name.as_str())));
+            danger.add(&r);
+        }
+        page_content.add(&danger);
+    }
+
     let toolbar = adw::ToolbarView::new();
     toolbar.add_css_class("translucent");
     toolbar.add_top_bar(&adw::HeaderBar::new());

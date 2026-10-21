@@ -44,7 +44,7 @@ install:
 	install -Dm644 data/icons/hicolor/symbolic/apps/$(APP_ID)-symbolic.svg \
 		"$(DESTDIR)$(DATADIR)/icons/hicolor/symbolic/apps/$(APP_ID)-symbolic.svg"
 	install -d "$(DESTDIR)$(DATADIR)/polkit-1/actions"
-	sed 's|/usr/lib/appreestr/appreestr-helper|$(HELPER)|' data/$(APP_ID).policy \
+	sed -e 's|/usr/lib/appreestr/appreestr-helper|$(HELPER)|' -e 's|/usr/bin/appreestr|$(PREFIX)/bin/appreestr|' data/$(APP_ID).policy \
 		> "$(DESTDIR)$(DATADIR)/polkit-1/actions/$(APP_ID).policy"
 	@for l in $(LINGUAS); do \
 		install -Dm644 $(TARGET)/release/$$l.mo "$(DESTDIR)$(DATADIR)/locale/$$l/LC_MESSAGES/appreestr.mo"; \

@@ -4,8 +4,12 @@
 //! must match the fingerprint the user confirmed, protected packages are refused, and the
 //! actual work is done by the standard tools (pacman, flatpak, snap) without a shell.
 //!
+//! `force-remove-packages` is the one deliberate exception: it is the "Danger Zone" of the GUI
+//! and removes exactly the packages the user confirmed (`pacman -Rdd`), protected or not.
+//!
 //! Usage:
 //!   appreestr-helper remove-packages [--recursive] [--nosave] --expect FINGERPRINT -- PKG...
+//!   appreestr-helper force-remove-packages [--recursive] [--nosave] --expect FINGERPRINT -- PKG...
 //!   appreestr-helper remove-flatpak -- REF
 //!   appreestr-helper remove-flatpak-unused --
 //!   appreestr-helper remove-snap -- NAME
@@ -56,7 +60,8 @@ fn main() -> ExitCode {
     };
     let (opts, operands) = (&rest[..sep], &rest[sep + 1..]);
     match cmd.as_str() {
-        "remove-packages" => remove_packages(opts, operands),
+        "remove-packages" => remove_packages(opts, operands, false),
+        "force-remove-packages" => remove_packages(opts, operands, true),
         "remove-flatpak" => remove_flatpak(opts, operands),
         "remove-snap" => remove_snap(opts, operands),
         "remove-flatpak-unused" => {
@@ -85,7 +90,10 @@ fn run(program: &str, args: &[&str]) -> ExitCode {
     }
 }
 
-fn remove_packages(opts: &[String], pkgs: &[String]) -> ExitCode {
+/// Most packages one request may name.
+const MAX_PACKAGES: usize = 256;
+
+fn remove_packages(opts: &[String], pkgs: &[String], force: bool) -> ExitCode {
     let mut recursive = false;
     let mut nosave = false;
     let mut expect: Option<&str> = None;
@@ -99,8 +107,8 @@ fn remove_packages(opts: &[String], pkgs: &[String]) -> ExitCode {
         }
     }
     let Some(expect) = expect else { return fail(Code::Usage, "missing --expect") };
-    if pkgs.is_empty() || pkgs.len() > 64 {
-        return fail(Code::Usage, "expected 1..64 packages");
+    if pkgs.is_empty() || pkgs.len() > MAX_PACKAGES {
+        return fail(Code::Usage, format!("expected 1..{MAX_PACKAGES} packages"));
     }
     if let Some(bad) = pkgs.iter().find(|p| !validate::package_name(p)) {
         return fail(Code::Usage, format!("invalid package name {bad:?}"));
@@ -109,37 +117,45 @@ fn remove_packages(opts: &[String], pkgs: &[String]) -> ExitCode {
         return fail(Code::Locked, "the package database is locked by another operation");
     }
 
-    let sys = SysRoot { home: PathBuf::from("/root"), ..SysRoot::host() };
-    // Only the bundled rules: user files are not read as root.
-    let rules = Rules::bundled();
-    let data = match pacman::scan(&sys, &DesktopIndex::default(), &rules) {
-        Ok(d) => d,
-        Err(e) => return fail(Code::Internal, format!("{e:#}")),
-    };
-    let processes = protect::processes(&sys);
-    let protection = protect::analyze(&protect::Input {
-        sys: &sys,
-        rules: &rules,
-        owners: &data.owners,
-        depends: &data.depends,
-        hold_pkgs: &data.hold_pkgs,
-        kernels: &data.kernels,
-        processes: &processes,
-    });
     let mut handle = match plan::open_local("/", "/var/lib/pacman") {
         Ok(h) => h,
         Err(e) => return fail(Code::Internal, e.to_string()),
     };
-    let p = match plan::plan(&mut handle, pkgs, recursive, Some(&protection)) {
+    let planned = if force {
+        // The user was shown what this breaks and confirmed it: no protection, no dependency checks.
+        plan::plan_force(&mut handle, pkgs, recursive, None)
+    } else {
+        let sys = SysRoot { home: PathBuf::from("/root"), ..SysRoot::host() };
+        // Only the bundled rules: user files are not read as root.
+        let rules = Rules::bundled();
+        let data = match pacman::scan(&sys, &DesktopIndex::default(), &rules) {
+            Ok(d) => d,
+            Err(e) => return fail(Code::Internal, format!("{e:#}")),
+        };
+        let processes = protect::processes(&sys);
+        let protection = protect::analyze(&protect::Input {
+            sys: &sys,
+            rules: &rules,
+            owners: &data.owners,
+            depends: &data.depends,
+            hold_pkgs: &data.hold_pkgs,
+            kernels: &data.kernels,
+            processes: &processes,
+        });
+        plan::plan(&mut handle, pkgs, recursive, Some(&protection))
+    };
+    let p = match planned {
         Ok(p) => p,
         Err(plan::PlanError::NotInstalled(n)) => return fail(Code::NotInstalled, format!("{n} is not installed")),
         Err(e) => return fail(Code::Internal, e.to_string()),
     };
-    if let Some((name, _)) = p.blocked.first() {
-        return fail(Code::Protected, format!("{name} is protected"));
-    }
-    if !p.needed_by.is_empty() {
-        return fail(Code::Protected, format!("needed by other packages: {:?}", p.needed_by));
+    if !force {
+        if let Some((name, _)) = p.blocked.first() {
+            return fail(Code::Protected, format!("{name} is protected"));
+        }
+        if !p.needed_by.is_empty() {
+            return fail(Code::Protected, format!("needed by other packages: {:?}", p.needed_by));
+        }
     }
     if p.fingerprint != expect {
         return fail(Code::PlanChanged, "the set of packages to remove changed since it was confirmed");
@@ -152,6 +168,9 @@ fn remove_packages(opts: &[String], pkgs: &[String]) -> ExitCode {
     }
     if nosave {
         flag.push('n');
+    }
+    if force {
+        flag.push_str("dd");
     }
     let mut args: Vec<&str> = vec![&flag, "--noconfirm", "--"];
     args.extend(pkgs.iter().map(String::as_str));

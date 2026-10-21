@@ -1,7 +1,7 @@
 //! The main window: the list, search, filters, and navigation to details.
 
 use crate::details::{self, DetailsPage};
-use crate::row::AppRow;
+use crate::row::{AppRow, Selection};
 use crate::ui::{self, LIST_WIDTH, SPACE_S, SPACE_XS};
 use appreestr_core::cache;
 use appreestr_core::config::{ConfigStore, Overrides, Settings, SortKey};
@@ -46,6 +46,10 @@ pub struct AppModel {
     visible: Vec<usize>,
     pub details: Option<DetailsPage>,
     pub progress: Option<crate::uninstall::Progress>,
+    /// Applications ticked in selection mode.
+    select: Selection,
+    /// A privileged copy is being started; wait for it.
+    elevating: bool,
     rescan_pending: bool,
     _watcher: Option<notify::RecommendedWatcher>,
 }
@@ -68,7 +72,20 @@ pub enum Msg {
     UninstallSelected,
     UninstallUnits(String, Vec<String>),
     StartJob(Box<crate::uninstall::JobRequest>),
-    Removed(String),
+    Removed(Vec<String>),
+    /// Enter or leave selection mode.
+    SelectMode(bool),
+    /// Tick everything that is listed, or untick it when it is all ticked already.
+    SelectAll,
+    #[cfg_attr(not(debug_assertions), allow(dead_code))]
+    SelectApps(Vec<String>),
+    SelectionChanged,
+    UninstallMany,
+    AskElevate,
+    Elevate,
+    /// The Danger Zone: choose any installed package to remove by force.
+    DangerZone,
+    ForcePlan(String),
     CleanPackages(Vec<String>),
     CleanFlatpak(FlatpakScope),
     DetailsClosed,
@@ -94,6 +111,9 @@ pub enum Cmd {
     Removal(crate::removal::Event),
     FollowUp { orphans: Vec<PlannedPkg>, flatpak: Option<FlatpakScope> },
     CleanPlanned(Box<(Result<RemovalPlan, String>, bool)>),
+    Elevate(crate::removal::Event),
+    DangerListing(Box<crate::danger::Listing>),
+    ForcePlanned(Box<crate::danger::Planned>),
 }
 
 // Kept short: relm4 logs command outputs, and a full scan result is megabytes of text.
@@ -101,11 +121,14 @@ impl std::fmt::Debug for Cmd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Cmd::Scanned(r) => write!(f, "Scanned({} apps)", r.apps.len()),
-            Cmd::Planned(p) => write!(f, "Planned({})", p.app.id),
+            Cmd::Planned(p) => write!(f, "Planned({} apps)", p.items.len()),
             Cmd::DetailsPlan(id, _) => write!(f, "DetailsPlan({id})"),
             Cmd::Removal(e) => write!(f, "Removal({e:?})"),
             Cmd::FollowUp { orphans, .. } => write!(f, "FollowUp({} orphans)", orphans.len()),
             Cmd::CleanPlanned(_) => write!(f, "CleanPlanned"),
+            Cmd::Elevate(e) => write!(f, "Elevate({e:?})"),
+            Cmd::DangerListing(l) => write!(f, "DangerListing({} packages)", l.packages.len()),
+            Cmd::ForcePlanned(p) => write!(f, "ForcePlanned({})", p.name),
         }
     }
 }
@@ -115,6 +138,11 @@ pub struct Widgets {
     stack: gtk::Stack,
     chips: Vec<(Option<SourceFilter>, gtk::ToggleButton)>,
     summary: gtk::Label,
+    toolbar: adw::ToolbarView,
+    select_toggle: gtk::ToggleButton,
+    select_all: gtk::Button,
+    uninstall_selected: gtk::Button,
+    admin_button: Option<gtk::Button>,
     empty: adw::StatusPage,
     empty_button: gtk::Button,
     nav: adw::NavigationView,
@@ -165,7 +193,10 @@ impl AppModel {
     fn refresh_list(&mut self, w: &Widgets) {
         self.visible = listing::select(&self.apps, &self.query);
         self.list.clear();
-        self.list.extend_from_iter(self.visible.iter().map(|&i| AppRow { app: self.apps[i].clone() }));
+        let select = self.select.clone();
+        self.list.extend_from_iter(
+            self.visible.iter().map(|&i| AppRow { app: self.apps[i].clone(), select: select.clone() }),
+        );
 
         let counts = listing::counts(&self.apps, self.query.show_system, self.query.show_console);
         let total: usize =
@@ -182,9 +213,7 @@ impl AppModel {
             }
         }
 
-        let size: u64 = self.visible.iter().filter_map(|&i| self.apps[i].total_size()).sum();
-        let n = self.visible.len() as u64;
-        w.summary.set_label(&format!("{} · {}", trn("{} application", "{} applications", n), format_size(size)));
+        self.update_summary(w);
 
         let page = if self.apps.is_empty() && !self.scanned_once {
             "loading"
@@ -197,6 +226,41 @@ impl AppModel {
             self.update_empty(w);
         }
         w.stack.set_visible_child_name(page);
+    }
+
+    /// Under the filters: what is listed, or in selection mode what is ticked.
+    fn update_summary(&self, w: &Widgets) {
+        if self.select.active() {
+            let ids = self.select.ids();
+            let size: u64 = self.apps.iter().filter(|a| ids.contains(&a.id)).filter_map(|a| a.total_size()).sum();
+            let text = if ids.is_empty() {
+                tr("Select applications to uninstall")
+            } else {
+                format!("{} · {}", trn("{} selected", "{} selected", ids.len() as u64), format_size(size))
+            };
+            w.summary.set_label(&text);
+            w.uninstall_selected.set_sensitive(!ids.is_empty());
+            let all = self.all_listed_selected();
+            w.select_all.set_label(&if all { tr("Select None") } else { tr("Select All") });
+            return;
+        }
+        let size: u64 = self.visible.iter().filter_map(|&i| self.apps[i].total_size()).sum();
+        let n = self.visible.len() as u64;
+        w.summary.set_label(&format!("{} · {}", trn("{} application", "{} applications", n), format_size(size)));
+    }
+
+    /// Every removable application that is listed now is ticked.
+    fn all_listed_selected(&self) -> bool {
+        let mut any = false;
+        for &i in &self.visible {
+            if self.apps[i].is_removable() {
+                any = true;
+                if !self.select.contains(&self.apps[i].id) {
+                    return false;
+                }
+            }
+        }
+        any
     }
 
     /// The "nothing to show" page explains why and offers the way out.
@@ -325,6 +389,7 @@ fn build_actions(sender: &ComponentSender<AppModel>, q: &ListQuery) -> gio::Simp
     string_action("open-path", Msg::OpenPath);
     string_action("uninstall", Msg::Uninstall);
     string_action("uninstall-unit", Msg::UninstallUnit);
+    string_action("force-remove", Msg::ForcePlan);
     string_action("mark-app", |id| Msg::Mark(id, Some(UserMark::App)));
     string_action("mark-hidden", |id| Msg::Mark(id, Some(UserMark::Hidden)));
     string_action("unmark", |id| Msg::Mark(id, None));
@@ -426,7 +491,8 @@ impl Component for AppModel {
     type CommandOutput = Cmd;
     type Input = Msg;
     type Output = ();
-    type Init = ();
+    /// Whether to tell the process that started us when the window is up.
+    type Init = bool;
     type Root = adw::ApplicationWindow;
     type Widgets = Widgets;
 
@@ -440,7 +506,16 @@ impl Component for AppModel {
             .build()
     }
 
-    fn init(_: (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(notify_ready: bool, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+        let is_root = crate::elevate::is_root();
+        if notify_ready {
+            let sent = std::cell::Cell::new(false);
+            root.connect_map(move |_| {
+                if !sent.replace(true) {
+                    crate::elevate::notify_ready();
+                }
+            });
+        }
         let sys = SysRoot::host();
         crate::icons::setup(&sys);
         let store = ConfigStore::new(&sys);
@@ -498,6 +573,22 @@ impl Component for AppModel {
         search.add_controller(skey);
         let header = adw::HeaderBar::builder().title_widget(&adw::WindowTitle::new("AppReestr", "")).build();
         let refresh_spinner = adw::Spinner::builder().visible(false).tooltip_text(tr("Updating the list…")).build();
+        let select_toggle = gtk::ToggleButton::builder()
+            .icon_name("selection-mode-symbolic")
+            .tooltip_text(tr("Select Applications"))
+            .build();
+        select_toggle.update_property(&[gtk::accessible::Property::Label(&tr("Select Applications"))]);
+        let s = sender.clone();
+        select_toggle.connect_toggled(move |b| s.input(Msg::SelectMode(b.is_active())));
+        header.pack_start(&select_toggle);
+        // Without administrator rights every removal asks for a password; this restarts with them.
+        let admin_button = (!is_root).then(|| {
+            let b = ui::icon_button("changes-prevent-symbolic", &tr("Restart as Administrator…"));
+            let s = sender.clone();
+            b.connect_clicked(move |_| s.input(Msg::AskElevate));
+            header.pack_start(&b);
+            b
+        });
         header.pack_start(&refresh_spinner);
         let menu_button = gtk::MenuButton::builder()
             .icon_name("open-menu-symbolic")
@@ -580,8 +671,27 @@ impl Component for AppModel {
         toolbar.add_css_class("translucent");
         root.add_css_class("translucent");
         toolbar.add_top_bar(&header);
+        let admin_banner = adw::Banner::builder()
+            .title(tr("Administrator mode: removing does not ask for a password."))
+            .revealed(is_root)
+            .build();
+        toolbar.add_top_bar(&admin_banner);
         toolbar.add_top_bar(&subheader);
         toolbar.set_content(Some(&stack));
+        // Selection mode: the action that applies to everything ticked.
+        let select_all = gtk::Button::builder().label(tr("Select All")).build();
+        select_all.add_css_class("flat");
+        let s = sender.clone();
+        select_all.connect_clicked(move |_| s.input(Msg::SelectAll));
+        let uninstall_selected = ui::pill(&tr("Uninstall…"), ui::Kind::Destructive);
+        uninstall_selected.set_sensitive(false);
+        let s = sender.clone();
+        uninstall_selected.connect_clicked(move |_| s.input(Msg::UninstallMany));
+        let select_bar = gtk::ActionBar::new();
+        select_bar.pack_start(&select_all);
+        select_bar.pack_end(&uninstall_selected);
+        toolbar.add_bottom_bar(&select_bar);
+        toolbar.set_reveal_bottom_bars(false);
         let list_page =
             adw::NavigationPage::builder().title(tr("Installed Applications")).tag("list").child(&toolbar).build();
         let nav = adw::NavigationView::new();
@@ -622,15 +732,24 @@ impl Component for AppModel {
             visible: Vec::new(),
             details: None,
             progress: None,
+            select: Selection::new(),
+            elevating: false,
             rescan_pending: false,
             _watcher: None,
         };
         model._watcher = crate::watcher::watch(&model.sys, &model.settings.appimage_dirs, sender.clone());
+        let s = sender.clone();
+        model.select.on_change(move || s.input(Msg::SelectionChanged));
         let widgets = Widgets {
             search,
             stack,
             chips,
             summary,
+            toolbar,
+            select_toggle,
+            select_all,
+            uninstall_selected,
+            admin_button,
             empty,
             empty_button,
             nav,
@@ -682,8 +801,14 @@ impl Component for AppModel {
             Msg::Refresh => self.start_scan(&sender, w),
             Msg::Activate(pos) => {
                 if let Some(&i) = self.visible.get(pos as usize) {
-                    let id = self.apps[i].id.clone();
-                    self.show_details(&id, w, &sender);
+                    let app = self.apps[i].clone();
+                    if self.select.active() {
+                        if app.is_removable() {
+                            self.select.toggle(&app.id);
+                        }
+                    } else {
+                        self.show_details(&app.id.clone(), w, &sender);
+                    }
                 }
             }
             Msg::Details(id) => self.show_details(&id, w, &sender),
@@ -695,6 +820,11 @@ impl Component for AppModel {
                     crate::uninstall::request(self, &app.id.clone(), Some(key), root, &sender);
                 }
             }
+            Msg::UninstallSelected if self.select.active() => {
+                if self.select.len() > 0 {
+                    sender.input(Msg::UninstallMany);
+                }
+            }
             Msg::UninstallSelected => {
                 let pos = self.list.selection_model.selected();
                 if let Some(&i) = self.visible.get(pos as usize) {
@@ -704,29 +834,98 @@ impl Component for AppModel {
             }
             Msg::UninstallUnits(id, keys) => crate::uninstall::plan_units(self, &id, &keys, &sender),
             Msg::StartJob(req) => crate::uninstall::start(self, *req, root, &sender),
-            Msg::Removed(id) => {
-                if self.details.as_ref().is_some_and(|d| d.app_id == id) && w.nav.navigation_stack().n_items() > 1 {
+            Msg::Removed(ids) => {
+                if self.details.as_ref().is_some_and(|d| ids.contains(&d.app_id))
+                    && w.nav.navigation_stack().n_items() > 1
+                {
                     w.nav.pop();
                     self.details = None;
                 }
+                if !ids.is_empty() {
+                    sender.input(Msg::SelectMode(false));
+                }
                 self.start_scan(&sender, w);
             }
+            Msg::SelectMode(on) => {
+                self.select.set_active(on);
+                if w.select_toggle.is_active() != on {
+                    w.select_toggle.set_active(on);
+                }
+            }
+            Msg::SelectAll => {
+                let listed: Vec<String> = self
+                    .visible
+                    .iter()
+                    .map(|&i| &self.apps[i])
+                    .filter(|a| a.is_removable())
+                    .map(|a| a.id.clone())
+                    .collect();
+                if self.all_listed_selected() {
+                    self.select.replace(self.select.ids().into_iter().filter(|id| !listed.contains(id)));
+                } else {
+                    self.select.replace(self.select.ids().into_iter().chain(listed));
+                }
+            }
+            Msg::SelectApps(ids) => {
+                sender.input(Msg::SelectMode(true));
+                self.select.set_active(true);
+                self.select.replace(ids);
+            }
+            Msg::SelectionChanged => {
+                w.toolbar.set_reveal_bottom_bars(self.select.active());
+                self.update_summary(w);
+            }
+            Msg::UninstallMany => {
+                let ids = self.select.ids();
+                crate::uninstall::request_many(self, &ids, root, &sender);
+            }
+            Msg::AskElevate => {
+                if self.elevating || self.progress.is_some() {
+                    return;
+                }
+                let d = adw::AlertDialog::new(
+                    Some(&tr("Restart as Administrator?")),
+                    Some(&tr(
+                        "AppReestr reopens with full system access. The password is asked once; removals then do not ask for it.",
+                    )),
+                );
+                d.add_response("cancel", &tr("Cancel"));
+                d.add_response("restart", &tr("Restart"));
+                d.set_response_appearance("restart", adw::ResponseAppearance::Suggested);
+                d.set_default_response(Some("cancel"));
+                d.set_close_response("cancel");
+                let s = sender.clone();
+                d.connect_response(None, move |_, r| {
+                    if r == "restart" {
+                        s.input(Msg::Elevate);
+                    }
+                });
+                d.present(Some(root));
+            }
+            Msg::Elevate => {
+                self.elevating = true;
+                if let Some(b) = &w.admin_button {
+                    b.set_sensitive(false);
+                }
+                sender.spawn_command(move |out| {
+                    let out = Arc::new(out);
+                    crate::removal::launch_elevated(move |e| {
+                        let _ = out.send(Cmd::Elevate(e));
+                    });
+                });
+            }
+            Msg::DangerZone => crate::danger::load(self, &sender),
+            Msg::ForcePlan(name) => crate::danger::plan_package(self, name, &sender),
             Msg::CleanPackages(names) => crate::uninstall::clean_packages(self, names, &sender),
             Msg::CleanFlatpak(scope) => {
                 let need_agent = scope == FlatpakScope::System;
                 crate::uninstall::start(
                     self,
-                    crate::uninstall::JobRequest {
-                        job: crate::removal::Job {
-                            title: tr("Unused Flatpak runtimes"),
-                            steps: vec![crate::removal::Step::FlatpakUnused { system: scope == FlatpakScope::System }],
-                            need_agent,
-                        },
-                        app_id: String::new(),
-                        had_pacman: false,
-                        had_flatpak: None,
-                        orphans_before: Vec::new(),
-                    },
+                    crate::uninstall::JobRequest::new(crate::removal::Job {
+                        title: tr("Unused Flatpak runtimes"),
+                        steps: vec![crate::removal::Step::FlatpakUnused { system: scope == FlatpakScope::System }],
+                        need_agent,
+                    }),
                     root,
                     &sender,
                 );
@@ -801,6 +1000,8 @@ impl Component for AppModel {
             Msg::Back => {
                 if w.nav.navigation_stack().n_items() > 1 {
                     w.nav.pop();
+                } else if self.select.active() {
+                    sender.input(Msg::SelectMode(false));
                 } else if !w.search.text().is_empty() {
                     w.search.set_text("");
                 }
@@ -829,6 +1030,9 @@ impl Component for AppModel {
                 }
                 let res = *res;
                 self.apps = res.apps.into_iter().map(Arc::new).collect();
+                // Ticked applications that are gone (just uninstalled, say) are forgotten.
+                let ticked = self.select.ids();
+                self.select.replace(ticked.into_iter().filter(|id| self.apps.iter().any(|a| &a.id == id)));
                 self.data = Arc::new(ScanData {
                     owners: res.owners,
                     depends: res.depends,
@@ -862,6 +1066,23 @@ impl Component for AppModel {
                 let (plan, need_agent) = *b;
                 crate::uninstall::confirm_clean(plan, need_agent, root, &sender);
             }
+            Cmd::Elevate(e) => match e {
+                crate::removal::Event::Password { message, reply } => {
+                    crate::uninstall::ask_password(root, &message, reply)
+                }
+                // The privileged copy is up: this one has nothing left to do.
+                crate::removal::Event::Done(Ok(())) => relm4::main_application().quit(),
+                crate::removal::Event::Done(Err(msg)) => {
+                    self.elevating = false;
+                    if let Some(b) = &w.admin_button {
+                        b.set_sensitive(true);
+                    }
+                    w.toasts.add_toast(adw::Toast::new(&msg));
+                }
+                _ => {}
+            },
+            Cmd::DangerListing(l) => crate::danger::picker(*l, root, &sender),
+            Cmd::ForcePlanned(p) => crate::danger::confirm(*p, root, &sender),
         }
     }
 }

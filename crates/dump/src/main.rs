@@ -13,7 +13,9 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let has = |f: &str| args.iter().any(|a| a == f);
     if has("--help") || has("-h") {
-        println!("usage: appreestr-dump [--json] [--timings] [--all] [--plan PKG...] [--leftovers APP-ID...]");
+        println!(
+            "usage: appreestr-dump [--json] [--timings] [--all] [--plan PKG...] [--force-plan PKG...] [--leftovers APP-ID...]"
+        );
         println!("  --all      also list console and system entries (not just counts)");
         return;
     }
@@ -31,6 +33,17 @@ fn main() {
         println!("polkit agent running: {}", prot.polkit_agent);
         let mut h = appreestr_core::plan::open_local("/", "/var/lib/pacman").expect("alpm");
         match appreestr_core::plan::plan(&mut h, &targets, true, Some(&prot)) {
+            Ok(p) => println!("{p:#?}"),
+            Err(e) => println!("error: {e}"),
+        }
+        return;
+    }
+    if let Some(i) = args.iter().position(|a| a == "--force-plan") {
+        // What the Danger Zone would do (read-only): dependencies ignored, protection only reported.
+        let targets: Vec<String> = args[i + 1..].to_vec();
+        let prot = res.protection(&sys, &rules);
+        let mut h = appreestr_core::plan::open_local("/", "/var/lib/pacman").expect("alpm");
+        match appreestr_core::plan::plan_force(&mut h, &targets, false, Some(&prot)) {
             Ok(p) => println!("{p:#?}"),
             Err(e) => println!("error: {e}"),
         }

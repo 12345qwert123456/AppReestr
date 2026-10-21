@@ -27,6 +27,9 @@ pub struct RemovalPlan {
     pub warnings: Vec<(String, Warning)>,
     /// Installed packages that use something being removed as an optional dependency.
     pub optional_for: Vec<(String, Vec<String>)>,
+    /// Installed packages that need something being removed and would be left broken
+    /// (only a forced removal, which ignores dependencies, can produce them).
+    pub broken: Vec<(String, Vec<String>)>,
     /// Fingerprint of `removed`, checked again by the privileged helper.
     pub fingerprint: String,
 }
@@ -74,9 +77,34 @@ pub fn plan(
     recursive: bool,
     protection: Option<&Protection>,
 ) -> Result<RemovalPlan, PlanError> {
+    plan_with(handle, targets, recursive, false, protection)
+}
+
+/// Simulate `pacman -R[s]dd` for `targets`: dependencies are not checked, so nothing is ever
+/// refused; what would be left broken is listed in `broken`. Protection is only reported.
+pub fn plan_force(
+    handle: &mut Alpm,
+    targets: &[String],
+    recursive: bool,
+    protection: Option<&Protection>,
+) -> Result<RemovalPlan, PlanError> {
+    plan_with(handle, targets, recursive, true, protection)
+}
+
+fn plan_with(
+    handle: &mut Alpm,
+    targets: &[String],
+    recursive: bool,
+    force: bool,
+    protection: Option<&Protection>,
+) -> Result<RemovalPlan, PlanError> {
     let mut flags = TransFlag::NO_LOCK;
     if recursive {
         flags |= TransFlag::RECURSE;
+    }
+    if force {
+        // What `-dd` does: no dependency checks at all.
+        flags |= TransFlag::NO_DEPS | TransFlag::NO_DEP_VERSION;
     }
     let mut out = RemovalPlan { targets: targets.to_vec(), ..Default::default() };
     handle.trans_init(flags).map_err(|e| PlanError::Alpm(e.to_string()))?;
@@ -138,6 +166,13 @@ pub fn plan(
             if !users.is_empty() {
                 out.optional_for.push((p.name.clone(), users));
             }
+            if force {
+                let needers: Vec<String> =
+                    pkg.required_by().iter().filter(|u| !removed_names.contains(*u)).map(String::from).collect();
+                if !needers.is_empty() {
+                    out.broken.push((p.name.clone(), needers));
+                }
+            }
         }
     }
 
@@ -157,6 +192,34 @@ pub fn plan(
         }
     }
     Ok(out)
+}
+
+/// An installed package, for choosing one to remove by hand.
+#[derive(Clone, Debug, PartialEq)]
+pub struct InstalledPkg {
+    pub name: String,
+    pub version: String,
+    pub desc: String,
+    pub size: u64,
+    pub explicit: bool,
+}
+
+/// Every package in the local database, by name.
+pub fn installed(handle: &Alpm) -> Vec<InstalledPkg> {
+    let mut v: Vec<InstalledPkg> = handle
+        .localdb()
+        .pkgs()
+        .iter()
+        .map(|p| InstalledPkg {
+            name: p.name().to_string(),
+            version: p.version().as_str().to_string(),
+            desc: p.desc().unwrap_or_default().to_string(),
+            size: u64::try_from(p.isize()).unwrap_or(0),
+            explicit: p.reason() == PackageReason::Explicit,
+        })
+        .collect();
+    v.sort_by(|a, b| a.name.cmp(&b.name));
+    v
 }
 
 /// Orphans: dependencies nothing needs any more (`pacman -Qdt`).
@@ -200,5 +263,21 @@ mod tests {
         assert!(!p.can_remove());
         assert!(!p.needed_by.is_empty());
         assert!(matches!(plan(&mut h, &["no-such-package-x".into()], true, None), Err(PlanError::NotInstalled(_))));
+    }
+
+    /// The forced plan removes exactly what was asked and reports what it would break.
+    #[test]
+    fn force_plan_ignores_dependencies() {
+        if !std::path::Path::new("/var/lib/pacman/local").is_dir() {
+            return;
+        }
+        let mut h = open_local("/", "/var/lib/pacman").unwrap();
+        let p = plan_force(&mut h, &["glibc".to_string()], false, None).unwrap();
+        assert!(p.can_remove());
+        assert_eq!(p.removed.len(), 1);
+        assert_eq!(p.removed[0].name, "glibc");
+        assert!(p.needed_by.is_empty());
+        assert!(!p.broken.is_empty());
+        assert!(installed(&h).iter().any(|i| i.name == "glibc"));
     }
 }

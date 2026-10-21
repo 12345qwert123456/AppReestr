@@ -1,7 +1,7 @@
 //! User settings and manual marks, stored as TOML in `~/.config/appreestr/`.
 
 use crate::model::UserMark;
-use crate::sysroot::SysRoot;
+use crate::sysroot::{SysRoot, as_user};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -97,11 +97,13 @@ impl ConfigStore {
     }
 
     fn save<T: Serialize>(&self, name: &str, value: &T) -> std::io::Result<()> {
-        std::fs::create_dir_all(&self.dir)?;
         let text = toml::to_string_pretty(value).map_err(std::io::Error::other)?;
-        let tmp = self.dir.join(format!(".{name}.tmp"));
-        std::fs::write(&tmp, text)?;
-        std::fs::rename(tmp, self.dir.join(name))
+        as_user(|| {
+            std::fs::create_dir_all(&self.dir)?;
+            let tmp = self.dir.join(format!(".{name}.tmp"));
+            std::fs::write(&tmp, text)?;
+            std::fs::rename(tmp, self.dir.join(name))
+        })
     }
 
     pub fn settings(&self) -> Settings {

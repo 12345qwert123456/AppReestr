@@ -20,3 +20,4 @@ tracing.workspace = true
 backhand.workspace = true
 gettext-rs.workspace = true
 libc = "0.2"
+nix.workspace = true

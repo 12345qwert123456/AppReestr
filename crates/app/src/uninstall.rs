@@ -14,20 +14,39 @@ use appreestr_core::rules::Rules;
 use appreestr_core::sysroot::SysRoot;
 use relm4::ComponentSender;
 use relm4::adw::{self, prelude::*};
-use relm4::gtk::{self, glib};
+use relm4::gtk;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
 /// Result of planning, shown in the confirmation dialog.
 pub struct Planned {
-    pub app: Arc<App>,
-    pub units: Vec<Installation>,
+    /// The applications that go, each with the installations that are removed.
+    pub items: Vec<(Arc<App>, Vec<Installation>)>,
+    /// The user's home folder: what is inside it goes to the trash, the rest needs the helper.
+    pub home: PathBuf,
     pub pacman: Option<Result<RemovalPlan, String>>,
     pub leftovers: Vec<Leftover>,
     pub need_agent: bool,
     pub orphans_before: Vec<String>,
+    /// Selected applications that were left out, with the reason (protected, or others need them).
+    pub skipped: Vec<(Arc<App>, String)>,
+}
+
+impl Planned {
+    /// The name of the one application, or a count for several.
+    fn subject(&self) -> String {
+        match self.items.as_slice() {
+            [(app, _)] => app.name.clone(),
+            items => trn("{} application", "{} applications", items.len() as u64),
+        }
+    }
+
+    pub fn units(&self) -> impl Iterator<Item = &Installation> {
+        self.items.iter().flat_map(|(_, u)| u.iter())
+    }
 }
 
 /// The progress dialog of a running job.
@@ -39,8 +58,8 @@ pub struct Progress {
     expander: gtk::Expander,
     close: gtk::Button,
     header: adw::HeaderBar,
-    pub app_id: String,
-    pub app_name: String,
+    pub app_ids: Vec<String>,
+    pub done_text: String,
     pub had_pacman: bool,
     pub had_flatpak: Option<FlatpakScope>,
     pub orphans_before: Vec<String>,
@@ -101,7 +120,37 @@ pub fn request(
         choose_units(&app, root, sender);
         return;
     }
-    plan_in_background(m, app, units, sender);
+    plan_in_background(m, vec![(app, units)], sender);
+}
+
+/// Several applications ticked in selection mode: remove each of them completely.
+pub fn request_many(
+    m: &mut AppModel,
+    ids: &[String],
+    root: &adw::ApplicationWindow,
+    sender: &ComponentSender<AppModel>,
+) {
+    if m.progress.is_some() {
+        return;
+    }
+    let items: Vec<(Arc<App>, Vec<Installation>)> = m
+        .apps
+        .iter()
+        .filter(|a| ids.contains(&a.id) && a.is_removable())
+        .map(|a| {
+            // Launchers made by other programs are not ours to remove.
+            let units = a.installs.iter().filter(|i| !matches!(i.source, Source::Shortcut { .. })).cloned().collect();
+            (a.clone(), units)
+        })
+        .collect();
+    match items.len() {
+        0 => {}
+        1 => {
+            let id = items[0].0.id.clone();
+            request(m, &id, None, root, sender);
+        }
+        _ => plan_in_background(m, items, sender),
+    }
 }
 
 /// Several ways of installation: let the user pick which to remove.
@@ -148,32 +197,86 @@ fn choose_units(app: &Arc<App>, root: &adw::ApplicationWindow, sender: &Componen
 pub fn plan_units(m: &mut AppModel, app_id: &str, keys: &[String], sender: &ComponentSender<AppModel>) {
     let Some(app) = m.apps.iter().find(|a| a.id == app_id).cloned() else { return };
     let units = app.installs.iter().filter(|i| keys.iter().any(|k| k == i.key.as_str())).cloned().collect();
-    plan_in_background(m, app, units, sender);
+    plan_in_background(m, vec![(app, units)], sender);
 }
 
-fn plan_in_background(m: &AppModel, app: Arc<App>, units: Vec<Installation>, sender: &ComponentSender<AppModel>) {
+fn pacman_names(units: &[Installation]) -> Vec<String> {
+    units.iter().filter(|u| u.source.is_pacman()).map(|u| u.unit_name.clone()).collect()
+}
+
+/// Why one application of a bulk removal cannot go with the others, if it cannot.
+fn skip_reason(plan: &RemovalPlan, selected_pkgs: &HashSet<String>) -> Option<String> {
+    if let Some((pkg, b)) = plan.blocked.first() {
+        return Some(block_text(pkg, b));
+    }
+    // Needed only by packages that are being removed as well: fine, the whole plan handles it.
+    let outsiders = plan.needed_by.iter().any(|(_, needers)| needers.iter().any(|n| !selected_pkgs.contains(n)));
+    if outsiders { blocked_reason(plan) } else { None }
+}
+
+fn plan_in_background(m: &AppModel, items: Vec<(Arc<App>, Vec<Installation>)>, sender: &ComponentSender<AppModel>) {
     let (sys, rules, data) = (m.sys.clone(), m.rules.clone(), m.data.clone());
-    let others: Vec<Arc<App>> = m.apps.iter().filter(|a| a.id != app.id).cloned().collect();
+    let chosen: HashSet<&str> = items.iter().map(|(a, _)| a.id.as_str()).collect();
+    let others: Vec<Arc<App>> = m.apps.iter().filter(|a| !chosen.contains(a.id.as_str())).cloned().collect();
     sender.spawn_oneshot_command(move || {
         let prot = protection(&sys, &rules, &data);
-        let pkgs: Vec<String> = units.iter().filter(|u| u.source.is_pacman()).map(|u| u.unit_name.clone()).collect();
-        let pacman = (!pkgs.is_empty()).then(|| {
-            plan::open_local("/", "/var/lib/pacman")
-                .and_then(|mut h| plan::plan(&mut h, &pkgs, true, Some(&prot)))
-                .map_err(|e| e.to_string())
-        });
+        let mut handle = plan::open_local("/", "/var/lib/pacman").map_err(|e| e.to_string());
+        let mut items = items;
+        let mut skipped: Vec<(Arc<App>, String)> = Vec::new();
+
+        // A protected application must not hold back the others: plan each one alone first.
+        if items.len() > 1
+            && let Ok(h) = handle.as_mut()
+        {
+            let all: HashSet<String> = items.iter().flat_map(|(_, u)| pacman_names(u)).collect();
+            items.retain(|(app, units)| {
+                let pkgs = pacman_names(units);
+                if pkgs.is_empty() {
+                    return true;
+                }
+                // An error here shows up again in the combined plan below.
+                match plan::plan(h, &pkgs, true, Some(&prot)).ok().and_then(|p| skip_reason(&p, &all)) {
+                    Some(reason) => {
+                        skipped.push((app.clone(), reason));
+                        false
+                    }
+                    None => true,
+                }
+            });
+        }
+
+        let mut pkgs: Vec<String> = Vec::new();
+        for (_, units) in &items {
+            for n in pacman_names(units) {
+                if !pkgs.contains(&n) {
+                    pkgs.push(n);
+                }
+            }
+        }
+        let pacman = (!pkgs.is_empty())
+            .then(|| handle.and_then(|mut h| plan::plan(&mut h, &pkgs, true, Some(&prot)).map_err(|e| e.to_string())));
+
+        // Leftovers only for applications that go away completely.
         let others: Vec<&App> = others.iter().map(|a| a.as_ref()).collect();
-        // Leftovers only when the application goes away completely.
-        let leftovers =
-            if units.len() == app.installs.len() { leftovers::find(&sys, &app, &others) } else { Vec::new() };
+        let mut leftovers: Vec<Leftover> = Vec::new();
+        for (app, units) in &items {
+            if units.len() == app.installs.len() {
+                for l in leftovers::find(&sys, app, &others) {
+                    if !leftovers.iter().any(|x| x.path == l.path) {
+                        leftovers.push(l);
+                    }
+                }
+            }
+        }
         let orphans_before = if pkgs.is_empty() { Vec::new() } else { orphan_names() };
         Cmd::Planned(Box::new(Planned {
-            app,
-            units,
+            items,
+            home: sys.home.clone(),
             pacman,
             leftovers,
             need_agent: !prot.polkit_agent,
             orphans_before,
+            skipped,
         }))
     });
 }
@@ -196,7 +299,21 @@ fn blocked_reason(plan: &RemovalPlan) -> Option<String> {
 
 /// The confirmation dialog (or an explanation why it cannot be removed).
 pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSender<AppModel>) {
-    let name = p.app.name.clone();
+    let name = p.subject();
+    if p.items.is_empty() {
+        let d = adw::AlertDialog::new(
+            Some(&tr("These applications cannot be uninstalled")),
+            Some(&tr("The system needs them, or other programs depend on them.")),
+        );
+        let list = ui::boxed_list();
+        for (app, reason) in &p.skipped {
+            list.append(&ui::warning_row(&trf("“{}”: {}", &[&app.name, reason])));
+        }
+        d.set_extra_child(Some(&list));
+        d.add_response("close", &tr("Close"));
+        d.present(Some(root));
+        return;
+    }
     if let Some(Err(e)) = &p.pacman {
         info_dialog(root, &trf("Cannot check “{}”", &[&name]), e);
         return;
@@ -213,6 +330,22 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
     let mut warnings: Vec<String> = Vec::new();
     let extra = ui::vbox(SPACE_S);
     let what = ui::boxed_list();
+
+    for (app, reason) in &p.skipped {
+        warnings.push(trf("“{}” stays installed: {}", &[&app.name, reason]));
+    }
+    if p.items.len() > 1 {
+        let exp = adw::ExpanderRow::builder()
+            .title(tr("Applications"))
+            .subtitle(format::escape(&p.items.len().to_string()))
+            .build();
+        for (app, _) in &p.items {
+            let mut sources: Vec<String> = app.installs.iter().map(|i| source_short(&i.source)).collect();
+            sources.dedup();
+            exp.add_row(&ui::row_with_size(&app.name, &sources.join(" + "), app.total_size()));
+        }
+        what.append(&exp);
+    }
 
     if let Some(Ok(plan)) = &p.pacman {
         size += plan.total_size;
@@ -240,7 +373,8 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
             warnings.push(warning_text("", &appreestr_core::protect::Warning::OptionalFor(users)));
         }
     }
-    for u in &p.units {
+    let home = p.home.clone();
+    for u in p.units() {
         match &u.source {
             Source::Flatpak { scope, flatpak_ref, .. } => {
                 size += u.size.unwrap_or(0);
@@ -259,7 +393,7 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
                 size += u.size.unwrap_or(0);
                 let mut user_paths: Vec<PathBuf> = Vec::new();
                 for loc in &u.locations {
-                    if loc.starts_with(glib::home_dir()) {
+                    if loc.starts_with(&home) {
                         user_paths.push(loc.clone());
                     } else {
                         steps.push(Step::RootPath { path: loc.clone() });
@@ -268,7 +402,7 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
                 }
                 // Launchers in the user's menu that belong to it.
                 for e in &u.desktop_entries {
-                    if e.path.starts_with(glib::home_dir()) && e.path.extension().is_some_and(|x| x == "desktop") {
+                    if e.path.starts_with(&home) && e.path.extension().is_some_and(|x| x == "desktop") {
                         user_paths.push(e.path.clone());
                     }
                 }
@@ -324,7 +458,11 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
     extra.append(&what);
 
     let text = trf("This frees {}.", &[&format_size(size)]);
-    let d = adw::AlertDialog::new(Some(&trf("Uninstall “{}”?", &[&name])), Some(&text));
+    let heading = match p.items.as_slice() {
+        [_] => trf("Uninstall “{}”?", &[&name]),
+        items => trn("Uninstall {} application?", "Uninstall {} applications?", items.len() as u64),
+    };
+    let d = adw::AlertDialog::new(Some(&heading), Some(&text));
     d.set_extra_child(Some(&extra));
     d.add_response("cancel", &tr("Cancel"));
     d.add_response("remove", &tr("Uninstall"));
@@ -334,13 +472,14 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
 
     let s = sender.clone();
     let had_pacman = p.pacman.is_some();
-    let had_flatpak = p.units.iter().find_map(|u| match u.source {
+    let had_flatpak = p.units().find_map(|u| match u.source {
         Source::Flatpak { scope, .. } => Some(scope),
         _ => None,
     });
     let need_agent = p.need_agent;
-    let app_id = p.app.id.clone();
+    let app_ids: Vec<String> = p.items.iter().map(|(a, _)| a.id.clone()).collect();
     let orphans_before = p.orphans_before.clone();
+    let count = p.items.len() as u64;
     d.connect_response(None, move |_, r| {
         if r != "remove" {
             return;
@@ -353,23 +492,46 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
                 steps.push(Step::Trash { paths });
             }
         }
-        s.input(Msg::StartJob(Box::new(JobRequest {
-            job: Job { title: name.clone(), steps, need_agent },
-            app_id: app_id.clone(),
-            had_pacman,
-            had_flatpak,
-            orphans_before: orphans_before.clone(),
-        })));
+        let mut req = JobRequest::new(Job { title: name.clone(), steps, need_agent });
+        if count > 1 {
+            req.heading = trn("Uninstalling {} application", "Uninstalling {} applications", count);
+            req.done_text = trn("{} application was uninstalled", "{} applications were uninstalled", count);
+        }
+        req.app_ids = app_ids.clone();
+        req.had_pacman = had_pacman;
+        req.had_flatpak = had_flatpak;
+        req.orphans_before = orphans_before.clone();
+        s.input(Msg::StartJob(Box::new(req)));
     });
     d.present(Some(root));
 }
 
 pub struct JobRequest {
     pub job: Job,
-    pub app_id: String,
+    /// Applications that disappear when the job succeeds.
+    pub app_ids: Vec<String>,
     pub had_pacman: bool,
     pub had_flatpak: Option<FlatpakScope>,
     pub orphans_before: Vec<String>,
+    /// Title of the progress dialog.
+    pub heading: String,
+    /// Shown in a toast when the job succeeds.
+    pub done_text: String,
+}
+
+impl JobRequest {
+    /// A job on one named thing; set the other fields when there is more to say.
+    pub fn new(job: Job) -> Self {
+        Self {
+            heading: trf("Uninstalling “{}”", &[&job.title]),
+            done_text: trf("“{}” was uninstalled", &[&job.title]),
+            job,
+            app_ids: Vec::new(),
+            had_pacman: false,
+            had_flatpak: None,
+            orphans_before: Vec::new(),
+        }
+    }
 }
 
 impl std::fmt::Debug for JobRequest {
@@ -413,12 +575,8 @@ pub fn start(m: &mut AppModel, req: JobRequest, root: &adw::ApplicationWindow, s
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&header);
     toolbar.set_content(Some(&content));
-    let dialog = adw::Dialog::builder()
-        .title(trf("Uninstalling “{}”", &[&req.job.title]))
-        .content_width(DIALOG_WIDTH)
-        .can_close(false)
-        .child(&toolbar)
-        .build();
+    let dialog =
+        adw::Dialog::builder().title(&req.heading).content_width(DIALOG_WIDTH).can_close(false).child(&toolbar).build();
     let d2 = dialog.clone();
     close.connect_clicked(move |_| {
         d2.set_can_close(true);
@@ -434,8 +592,8 @@ pub fn start(m: &mut AppModel, req: JobRequest, root: &adw::ApplicationWindow, s
         expander,
         close,
         header,
-        app_id: req.app_id,
-        app_name: req.job.title.clone(),
+        app_ids: req.app_ids,
+        done_text: req.done_text,
         had_pacman: req.had_pacman,
         had_flatpak: req.had_flatpak,
         orphans_before: req.orphans_before,
@@ -469,8 +627,8 @@ pub fn on_event(
             let p = m.progress.take().unwrap();
             p.dialog.set_can_close(true);
             p.dialog.close();
-            toasts.add_toast(adw::Toast::new(&trf("“{}” was uninstalled", &[&p.app_name])));
-            sender.input(Msg::Removed(p.app_id.clone()));
+            toasts.add_toast(adw::Toast::new(&p.done_text));
+            sender.input(Msg::Removed(p.app_ids.clone()));
             follow_up(m, p, sender);
         }
         Event::Done(Err(msg)) => {
@@ -504,7 +662,7 @@ fn follow_up(m: &mut AppModel, p: Progress, sender: &ComponentSender<AppModel>) 
     });
 }
 
-fn ask_password(root: &adw::ApplicationWindow, message: &str, reply: std::sync::mpsc::Sender<Option<String>>) {
+pub fn ask_password(root: &adw::ApplicationWindow, message: &str, reply: std::sync::mpsc::Sender<Option<String>>) {
     let d = adw::AlertDialog::new(Some(&tr("Authentication Required")), Some(message));
     let entry = adw::PasswordEntryRow::builder().title(tr("Password")).build();
     let list = ui::boxed_list();
@@ -607,21 +765,15 @@ pub fn confirm_clean(
     let s = sender.clone();
     d.connect_response(None, move |_, r| {
         if r == "remove" {
-            s.input(Msg::StartJob(Box::new(JobRequest {
-                job: Job {
-                    title: tr("Unused components"),
-                    steps: vec![Step::Pacman {
-                        pkgs: plan.targets.clone(),
-                        fingerprint: plan.fingerprint.clone(),
-                        nosave: false,
-                    }],
-                    need_agent,
-                },
-                app_id: String::new(),
-                had_pacman: false,
-                had_flatpak: None,
-                orphans_before: Vec::new(),
-            })));
+            s.input(Msg::StartJob(Box::new(JobRequest::new(Job {
+                title: tr("Unused components"),
+                steps: vec![Step::Pacman {
+                    pkgs: plan.targets.clone(),
+                    fingerprint: plan.fingerprint.clone(),
+                    nosave: false,
+                }],
+                need_agent,
+            }))));
         }
     });
     d.present(Some(root));

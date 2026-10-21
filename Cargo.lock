@@ -69,6 +69,7 @@ dependencies = [
  "backhand",
  "gettext-rs",
  "libc",
+ "nix",
  "pacmanconf",
  "postcard",
  "quick-xml",

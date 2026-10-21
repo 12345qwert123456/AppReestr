@@ -5,8 +5,14 @@
 //! fails. In that case we start polkit's own text agent (`pkttyagent`) for this process only,
 //! on a pseudo-terminal, and show its password prompt in our window. The password is passed
 //! straight to the agent and not kept.
+//!
+//! When the whole application runs as root (see `elevate.rs`) the helper is started directly:
+//! there is nothing to ask. Steps that belong to the user (their Flatpak installation, their
+//! trash) are then run with the user's identity so that no root-owned files appear in their home.
 
+use crate::elevate;
 use appreestr_core::i18n::{tr, trf};
+use appreestr_core::sysroot::invoking_user;
 use nix::pty::openpty;
 use relm4::gtk::gio::{self, prelude::FileExt};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -22,6 +28,13 @@ pub enum Step {
     Pacman {
         pkgs: Vec<String>,
         fingerprint: String,
+        nosave: bool,
+    },
+    /// `pacman -Rdd`: the Danger Zone. Ignores dependencies and protection.
+    PacmanForce {
+        pkgs: Vec<String>,
+        fingerprint: String,
+        recursive: bool,
         nosave: bool,
     },
     FlatpakUser {
@@ -98,8 +111,10 @@ pub fn helper_path() -> PathBuf {
 pub fn run(job: Job, emit: impl Fn(Event) + Send + Sync + Clone + 'static) {
     let mut agent: Option<Agent> = None;
     let mut result = Ok(());
+    // As root there is nobody to ask.
+    let need_agent = job.need_agent && !elevate::is_root();
     for step in &job.steps {
-        if step.privileged() && job.need_agent && agent.is_none() {
+        if step.privileged() && need_agent && agent.is_none() {
             agent = Agent::start(emit.clone());
         }
         result = run_step(step, &emit);
@@ -145,6 +160,19 @@ fn run_step(step: &Step, emit: &(impl Fn(Event) + Clone + Send + 'static)) -> Re
             args.extend(pkgs.iter().cloned());
             privileged(&helper, &args, emit)
         }
+        Step::PacmanForce { pkgs, fingerprint, recursive, nosave } => {
+            emit(Event::Status(tr("Removing packages…")));
+            let mut args = vec!["force-remove-packages".to_string()];
+            if *recursive {
+                args.push("--recursive".into());
+            }
+            if *nosave {
+                args.push("--nosave".into());
+            }
+            args.extend(["--expect".into(), fingerprint.clone(), "--".into()]);
+            args.extend(pkgs.iter().cloned());
+            privileged(&helper, &args, emit)
+        }
         Step::FlatpakSystem { flatpak_ref } => {
             emit(Event::Status(tr("Removing the Flatpak application…")));
             privileged(&helper, &["remove-flatpak".into(), "--".into(), flatpak_ref.clone()], emit)
@@ -159,7 +187,7 @@ fn run_step(step: &Step, emit: &(impl Fn(Event) + Clone + Send + 'static)) -> Re
         }
         Step::FlatpakUser { flatpak_ref } => {
             emit(Event::Status(tr("Removing the Flatpak application…")));
-            let mut cmd = Command::new("flatpak");
+            let mut cmd = user_command("flatpak");
             cmd.args(["uninstall", "--user", "--noninteractive", "-y", flatpak_ref]);
             let code = stream(cmd, emit)?.0;
             if code == 0 { Ok(()) } else { Err(trf("flatpak exited with code {}", &[&code.to_string()]).into()) }
@@ -170,7 +198,7 @@ fn run_step(step: &Step, emit: &(impl Fn(Event) + Clone + Send + 'static)) -> Re
         }
         Step::FlatpakUnused { system: false } => {
             emit(Event::Status(tr("Removing unused Flatpak runtimes…")));
-            let mut cmd = Command::new("flatpak");
+            let mut cmd = user_command("flatpak");
             cmd.args(["uninstall", "--user", "--unused", "--noninteractive", "-y"]);
             let code = stream(cmd, emit)?.0;
             if code == 0 { Ok(()) } else { Err(trf("flatpak exited with code {}", &[&code.to_string()]).into()) }
@@ -181,14 +209,22 @@ fn run_step(step: &Step, emit: &(impl Fn(Event) + Clone + Send + 'static)) -> Re
                 if p.symlink_metadata().is_err() {
                     continue;
                 }
-                match gio::File::for_path(p).trash(None::<&gio::Cancellable>) {
+                let moved = if invoking_user().is_some() {
+                    // Root would put it in its own trash, or leave root-owned files in the user's.
+                    let mut cmd = user_command("gio");
+                    cmd.args(["trash", "--"]).arg(p);
+                    match stream(cmd, emit) {
+                        Ok((0, _)) => Ok(()),
+                        Ok((_, errors)) => Err(errors.join(" ")),
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    gio::File::for_path(p).trash(None::<&gio::Cancellable>).map_err(|e| e.to_string())
+                };
+                match moved {
                     Ok(()) => emit(Event::Log(trf("Moved to the trash: {}", &[&p.display().to_string()]))),
                     Err(e) => {
-                        return Err(trf(
-                            "Cannot move {} to the trash: {}",
-                            &[&p.display().to_string(), &e.to_string()],
-                        )
-                        .into());
+                        return Err(trf("Cannot move {} to the trash: {}", &[&p.display().to_string(), &e]).into());
                     }
                 }
             }
@@ -219,13 +255,41 @@ fn stream(mut cmd: Command, emit: &(impl Fn(Event) + Clone + Send + 'static)) ->
     Ok((status.code().unwrap_or(-1), errors))
 }
 
+/// A command that works on the user's own files. In an administrator session it runs with the
+/// user's identity and environment; otherwise it is an ordinary command.
+fn user_command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    if let Some(u) = invoking_user() {
+        let run = format!("/run/user/{}", u.uid);
+        cmd.env_clear()
+            .env("HOME", &u.home)
+            .env("USER", &u.name)
+            .env("LOGNAME", &u.name)
+            .env("PATH", "/usr/local/bin:/usr/bin:/bin")
+            .env("XDG_RUNTIME_DIR", &run)
+            .env("DBUS_SESSION_BUS_ADDRESS", format!("unix:path={run}/bus"))
+            .uid(u.uid)
+            .gid(u.gid);
+    }
+    cmd
+}
+
 fn privileged(
     helper: &str,
     args: &[String],
     emit: &(impl Fn(Event) + Clone + Send + 'static),
 ) -> Result<(), StepError> {
-    let mut cmd = Command::new("pkexec");
-    cmd.arg(helper).args(args);
+    let mut cmd = if elevate::is_root() {
+        // Already administrator. The helper gets a plain environment, as it would from pkexec.
+        let mut c = Command::new(helper);
+        c.env_clear().env("PATH", "/usr/bin:/bin:/usr/sbin:/sbin").env("HOME", "/root");
+        c
+    } else {
+        let mut c = Command::new("pkexec");
+        c.arg(helper);
+        c
+    };
+    cmd.args(args);
     let (code, errors) = stream(cmd, emit)?;
     let msg = match code {
         0 => return Ok(()),
@@ -242,6 +306,58 @@ fn privileged(
         c => trf("Unexpected error (code {})", &[&c.to_string()]),
     };
     Err(StepError::Failed(msg))
+}
+
+/// Start a privileged copy of the application through pkexec and wait until its window is up
+/// (it prints `READY`). Reports `Done(Ok)` then; the caller closes the original window.
+pub fn launch_elevated(emit: impl Fn(Event) + Send + Sync + Clone + 'static) {
+    let mut agent: Option<Agent> = None;
+    let mut result = elevated_once(&emit);
+    if matches!(&result, Err(StepError::NoAgent)) {
+        emit(Event::Log(tr("No authentication agent is running; asking for the password here.")));
+        agent = Agent::start(emit.clone());
+        result = elevated_once(&emit);
+    }
+    drop(agent);
+    emit(Event::Done(result.map_err(|e| match e {
+        StepError::NoAgent => tr("No authentication agent is available to ask for the password."),
+        StepError::Failed(m) => m,
+    })));
+}
+
+fn elevated_once(emit: &(impl Fn(Event) + Clone + Send + 'static)) -> Result<(), StepError> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    // After an upgrade the running binary is reported as "… (deleted)".
+    let exe = PathBuf::from(exe.to_string_lossy().trim_end_matches(" (deleted)"));
+    let mut cmd = Command::new("pkexec");
+    cmd.arg(&exe).args(elevate::relaunch_args());
+    cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| e.to_string())?;
+    let err = child.stderr.take().unwrap();
+    let e2 = emit.clone();
+    let errors = std::thread::spawn(move || {
+        let mut lines = Vec::new();
+        for line in BufReader::new(err).lines().map_while(Result::ok) {
+            lines.push(line.clone());
+            e2(Event::Log(line));
+        }
+        lines
+    });
+    for line in BufReader::new(child.stdout.take().unwrap()).lines().map_while(Result::ok) {
+        if line.trim() == "READY" {
+            // From here the privileged copy runs on its own; do not wait for it.
+            return Ok(());
+        }
+        emit(Event::Log(line));
+    }
+    let code = child.wait().map_err(|e| e.to_string())?.code().unwrap_or(-1);
+    let errors = errors.join().unwrap_or_default();
+    Err(match code {
+        126 => StepError::Failed(tr("Authentication was cancelled.")),
+        127 if errors.iter().any(|l| l.contains("No authentication agent found")) => StepError::NoAgent,
+        127 => StepError::Failed(tr("Authentication failed: wrong password, or no authentication agent is available.")),
+        c => StepError::Failed(trf("The administrator session did not start (code {})", &[&c.to_string()])),
+    })
 }
 
 /// polkit's text agent running on a pseudo-terminal, registered for this process only.

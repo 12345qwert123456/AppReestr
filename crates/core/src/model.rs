@@ -361,6 +361,11 @@ impl App {
         &self.installs[0]
     }
 
+    /// Launchers made by other programs (Steam, Wine…) are only listed, never removed from here.
+    pub fn is_removable(&self) -> bool {
+        self.installs.iter().any(|i| !matches!(i.source, Source::Shortcut { .. }))
+    }
+
     pub fn total_size(&self) -> Option<u64> {
         let sizes: Vec<u64> = self.installs.iter().filter_map(|i| i.size).collect();
         (!sizes.is_empty()).then(|| sizes.iter().sum())

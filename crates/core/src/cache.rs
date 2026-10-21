@@ -1,6 +1,7 @@
 //! Snapshot of the last scan, shown instantly at startup while a fresh scan runs.
 
 use crate::model::App;
+use crate::sysroot::as_user;
 use std::path::{Path, PathBuf};
 
 /// Bump when the model changes incompatibly.
@@ -12,15 +13,17 @@ pub fn snapshot_path(cache_home: &Path) -> PathBuf {
 
 pub fn save(path: &Path, apps: &[App]) -> std::io::Result<()> {
     let body = postcard::to_stdvec(apps).map_err(std::io::Error::other)?;
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
     let mut data = Vec::with_capacity(MAGIC.len() + body.len());
     data.extend_from_slice(MAGIC);
     data.extend_from_slice(&body);
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, data)?;
-    std::fs::rename(tmp, path)
+    as_user(|| {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, data)?;
+        std::fs::rename(tmp, path)
+    })
 }
 
 pub fn load(path: &Path) -> Option<Vec<App>> {

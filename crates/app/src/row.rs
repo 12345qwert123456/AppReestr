@@ -7,13 +7,144 @@ use appreestr_core::model::{App, Visibility};
 use appreestr_core::reasons::{format_size, source_short};
 use relm4::gtk::{self, gio, glib, prelude::*};
 use relm4::typed_view::list::RelmListItem;
+use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
+use std::rc::Rc;
 use std::sync::Arc;
+
+/// Selection mode: which applications are ticked. Shared by the window and the rows; the rows
+/// that are on screen are updated in place, so the list keeps its scroll position.
+#[derive(Clone)]
+pub struct Selection(Rc<SelectionInner>);
+
+struct SelectionInner {
+    active: Cell<bool>,
+    ids: RefCell<HashSet<String>>,
+    /// Set while the state is pushed into the check buttons, so their signal is ignored.
+    syncing: Cell<bool>,
+    /// The check buttons of the rows that are on screen, with the application they show.
+    bound: RefCell<Vec<(gtk::CheckButton, String)>>,
+    changed: RefCell<Option<Box<dyn Fn()>>>,
+}
+
+impl Selection {
+    pub fn new() -> Self {
+        Selection(Rc::new(SelectionInner {
+            active: Cell::new(false),
+            ids: RefCell::new(HashSet::new()),
+            syncing: Cell::new(false),
+            bound: RefCell::new(Vec::new()),
+            changed: RefCell::new(None),
+        }))
+    }
+
+    /// Called after every change of the ticked set.
+    pub fn on_change(&self, f: impl Fn() + 'static) {
+        *self.0.changed.borrow_mut() = Some(Box::new(f));
+    }
+
+    fn notify(&self) {
+        if let Some(f) = &*self.0.changed.borrow() {
+            f();
+        }
+    }
+
+    pub fn active(&self) -> bool {
+        self.0.active.get()
+    }
+
+    /// Enter or leave selection mode; leaving forgets what was ticked.
+    pub fn set_active(&self, on: bool) {
+        if self.0.active.replace(on) == on {
+            return;
+        }
+        if !on {
+            self.0.ids.borrow_mut().clear();
+        }
+        self.push_to_rows();
+        self.notify();
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.0.ids.borrow().contains(id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.ids.borrow().len()
+    }
+
+    pub fn ids(&self) -> Vec<String> {
+        self.0.ids.borrow().iter().cloned().collect()
+    }
+
+    pub fn toggle(&self, id: &str) {
+        self.set(id, !self.contains(id));
+    }
+
+    pub fn set(&self, id: &str, on: bool) {
+        let changed =
+            if on { self.0.ids.borrow_mut().insert(id.to_string()) } else { self.0.ids.borrow_mut().remove(id) };
+        if changed {
+            self.push_to_rows();
+            self.notify();
+        }
+    }
+
+    /// Replace the ticked set (select all, select none, or drop applications that are gone).
+    pub fn replace(&self, ids: impl IntoIterator<Item = String>) {
+        let new: HashSet<String> = ids.into_iter().collect();
+        if *self.0.ids.borrow() != new {
+            *self.0.ids.borrow_mut() = new;
+            self.push_to_rows();
+            self.notify();
+        }
+    }
+
+    fn push_to_rows(&self) {
+        self.0.syncing.set(true);
+        for (check, id) in self.0.bound.borrow().iter() {
+            check.set_visible(self.active());
+            check.set_active(self.contains(id));
+        }
+        self.0.syncing.set(false);
+    }
+
+    fn bind(&self, check: &gtk::CheckButton, id: &str) {
+        let mut bound = self.0.bound.borrow_mut();
+        bound.retain(|(c, _)| c != check);
+        bound.push((check.clone(), id.to_string()));
+        drop(bound);
+        self.0.syncing.set(true);
+        check.set_visible(self.active());
+        check.set_active(self.contains(id));
+        self.0.syncing.set(false);
+    }
+
+    fn unbind(&self, check: &gtk::CheckButton) {
+        self.0.bound.borrow_mut().retain(|(c, _)| c != check);
+    }
+
+    /// The user ticked a row's check button.
+    fn ticked(&self, id: &str, on: bool) {
+        if self.0.syncing.get() {
+            return;
+        }
+        let changed =
+            if on { self.0.ids.borrow_mut().insert(id.to_string()) } else { self.0.ids.borrow_mut().remove(id) };
+        if changed {
+            self.notify();
+        }
+    }
+}
 
 pub struct AppRow {
     pub app: Arc<App>,
+    pub select: Selection,
 }
 
 pub struct RowWidgets {
+    check: gtk::CheckButton,
+    ticked: Option<glib::SignalHandlerId>,
     icon: gtk::Image,
     title: gtk::Label,
     subtitle: gtk::Label,
@@ -55,6 +186,7 @@ impl RelmListItem for AppRow {
         let root = ui::hbox(SPACE_S);
         root.set_margin_top(SPACE_XS);
         root.set_margin_bottom(SPACE_XS);
+        let check = gtk::CheckButton::builder().valign(gtk::Align::Center).visible(false).build();
         let icon = gtk::Image::builder().pixel_size(ICON_ROW).build();
         icon.add_css_class("icon-dropshadow");
         let text = ui::vbox(0);
@@ -79,11 +211,12 @@ impl RelmListItem for AppRow {
             .build();
         menu.add_css_class("flat");
         menu.update_property(&[gtk::accessible::Property::Label(&tr("Actions"))]);
+        root.append(&check);
         root.append(&icon);
         root.append(&text);
         root.append(&meta);
         root.append(&menu);
-        (root, RowWidgets { icon, title, subtitle, size, date, menu })
+        (root, RowWidgets { check, ticked: None, icon, title, subtitle, size, date, menu })
     }
 
     fn bind(&mut self, w: &mut RowWidgets, _root: &mut gtk::Box) {
@@ -102,5 +235,18 @@ impl RelmListItem for AppRow {
         w.date.set_label(&app.installed_at().map(format::date).unwrap_or_default());
         w.menu.set_menu_model(Some(&row_menu(app)));
         w.menu.update_property(&[gtk::accessible::Property::Label(&trf("Actions for “{}”", &[&app.name]))]);
+
+        w.check.set_sensitive(app.is_removable());
+        w.check.update_property(&[gtk::accessible::Property::Label(&trf("Select “{}”", &[&app.name]))]);
+        self.select.bind(&w.check, &app.id);
+        let (select, id) = (self.select.clone(), app.id.clone());
+        w.ticked = Some(w.check.connect_toggled(move |c| select.ticked(&id, c.is_active())));
+    }
+
+    fn unbind(&mut self, w: &mut RowWidgets, _root: &mut gtk::Box) {
+        if let Some(h) = w.ticked.take() {
+            w.check.disconnect(h);
+        }
+        self.select.unbind(&w.check);
     }
 }
