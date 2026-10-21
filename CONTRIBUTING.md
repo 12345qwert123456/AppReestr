@@ -32,6 +32,19 @@ make check    # fmt --check, clippy -D warnings, tests, desktop/metainfo validat
   Never route an ordinary uninstall through `force-remove-packages`.
 - Do not run `pkexec` probes casually: your session's polkit agent will show a password dialog.
 
+## Releasing (maintainers)
+
+```bash
+tools/bump-version.sh X.Y.Z    # Cargo.toml, Cargo.lock, metainfo, packaging/aur/appreestr
+git commit -am "Release X.Y.Z" && git tag vX.Y.Z && git push --follow-tags
+```
+
+The `Release` workflow checks that the tag, `Cargo.toml`, the metainfo and the PKGBUILD agree, runs
+`make check`, publishes the GitHub Release (source tarball, checksum, package) and pushes `appreestr`
+and `appreestr-git` to the AUR. It needs the repository secret `AUR_SSH_PRIVATE_KEY` (the private
+half of a key added to the maintainer's AUR account). "Run workflow" with `dry_run` builds everything
+and publishes nothing.
+
 ## Reporting bugs
 
 Open an issue and include the output of `appreestr-dump --timings --all` (or `--plan PKG`) when the

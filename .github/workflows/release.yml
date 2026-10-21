@@ -1,0 +1,149 @@
+name: Release
+
+# Push a tag vX.Y.Z (after tools/bump-version.sh X.Y.Z): this builds the source tarball and a
+# package, publishes a GitHub Release and updates the AUR packages `appreestr` and `appreestr-git`.
+# "Run workflow" with dry_run builds everything and publishes nothing.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build only; publish nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Published ED25519 host key of aur.archlinux.org; the job refuses any other key.
+  AUR_FINGERPRINT: SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed rust gtk4 libadwaita gettext desktop-file-utils appstream git sudo
+      - uses: actions/checkout@v7
+      - name: Check that the tag, Cargo.toml and the metainfo agree
+        id: ver
+        run: |
+          ver=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
+          meta=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' data/io.github.appreestr.AppReestr.metainfo.xml | head -n1)
+          aur=$(sed -n 's/^pkgver=//p' packaging/aur/appreestr/PKGBUILD)
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$ver" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $ver"; exit 1
+          fi
+          if [ "$meta" != "$ver" ] || [ "$aur" != "$ver" ]; then
+            echo "::error::version mismatch: Cargo.toml=$ver metainfo=$meta PKGBUILD=$aur (run tools/bump-version.sh)"; exit 1
+          fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+      - name: Format, lint, test, validate data files
+        run: make check
+      - name: Source tarball
+        run: |
+          ver=${{ steps.ver.outputs.version }}
+          mkdir dist
+          git config --global --add safe.directory "$PWD"
+          git archive --prefix="appreestr-$ver/" -o "dist/appreestr-$ver.tar.gz" HEAD
+          (cd dist && sha256sum "appreestr-$ver.tar.gz" > "appreestr-$ver.tar.gz.sha256")
+      - name: Build the package from the tarball
+        run: |
+          ver=${{ steps.ver.outputs.version }}
+          useradd -m builder
+          mkdir /tmp/pkg
+          cp "dist/appreestr-$ver.tar.gz" /tmp/pkg/
+          cp packaging/aur/appreestr/PKGBUILD /tmp/pkg/
+          # Build from the local tarball: the release does not exist yet.
+          sed -i "s|^source=.*|source=(\"appreestr-$ver.tar.gz\")|" /tmp/pkg/PKGBUILD
+          chown -R builder: /tmp/pkg
+          sudo -u builder bash -c 'cd /tmp/pkg && makepkg --noconfirm --nodeps -f'
+          cp /tmp/pkg/*.pkg.tar.zst dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          gh release create "v$VERSION" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "AppReestr $VERSION" --generate-notes --verify-tag
+
+  aur:
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    strategy:
+      matrix:
+        package: [appreestr, appreestr-git]
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed git openssh sudo
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Configure SSH for the AUR
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          [ -n "$AUR_SSH_PRIVATE_KEY" ] || { echo "::error::secret AUR_SSH_PRIVATE_KEY is not set"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan -t ed25519 aur.archlinux.org > ~/.ssh/known_hosts 2>/dev/null
+          got=$(ssh-keygen -lf ~/.ssh/known_hosts | awk '{print $2}')
+          [ "$got" = "$AUR_FINGERPRINT" ] || { echo "::error::unexpected AUR host key $got"; exit 1; }
+          printf 'Host aur.archlinux.org\n  User aur\n  IdentityFile ~/.ssh/aur\n  IdentitiesOnly yes\n' > ~/.ssh/config
+      - name: Update the AUR repository
+        env:
+          PACKAGE: ${{ matrix.package }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          git clone "ssh://aur@aur.archlinux.org/$PACKAGE.git" aur-repo
+          cp "packaging/aur/$PACKAGE/PKGBUILD" aur-repo/PKGBUILD
+          if [ "$PACKAGE" = appreestr ]; then
+            sum=$(cut -d' ' -f1 "dist/appreestr-$VERSION.tar.gz.sha256")
+            sed -i "s/^sha256sums=.*/sha256sums=('$sum')/" aur-repo/PKGBUILD
+          fi
+          # makepkg refuses to run as root.
+          id builder >/dev/null 2>&1 || useradd -m builder
+          chown -R builder: aur-repo
+          sudo -u builder bash -c 'cd aur-repo && makepkg --printsrcinfo > .SRCINFO'
+          cd aur-repo
+          git config --global --add safe.directory "$PWD"
+          git config user.name "AppReestr release bot"
+          git config user.email "noreply@github.com"
+          git add PKGBUILD .SRCINFO
+          if git diff --cached --quiet; then
+            echo "$PACKAGE is already up to date"
+          else
+            git commit -m "Update to $VERSION"
+            git push origin HEAD:master
+          fi
