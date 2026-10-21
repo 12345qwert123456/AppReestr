@@ -1,0 +1,11 @@
+[package]
+name = "appreestr-dump"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Developer tool: prints what AppReestr would list and why"
+
+[dependencies]
+appreestr-core.workspace = true
+serde_json.workspace = true
+tracing-subscriber.workspace = true

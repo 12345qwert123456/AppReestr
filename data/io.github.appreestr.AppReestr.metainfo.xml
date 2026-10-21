@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.appreestr.AppReestr</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>AppReestr</name>
+  <summary>See every installed application and remove it safely</summary>
+  <summary xml:lang="ru">Все установленные программы и их безопасное удаление</summary>
+  <description>
+    <p>AppReestr shows the applications installed on an Arch Linux system in one list, like
+      “Installed apps” in Windows: only programs you use, not libraries and system plumbing.</p>
+    <ul>
+      <li>Packages from the official repositories and the AUR, Flatpak, AppImage, Snap and manual installs</li>
+      <li>Where each program came from, when and how it was installed, and what it brought along</li>
+      <li>Safe removal with the standard tools; the system and the desktop are protected</li>
+      <li>Optional removal of settings and caches into the trash</li>
+    </ul>
+    <p xml:lang="ru">AppReestr показывает установленные в Arch Linux программы одним списком, как
+      «Установленные приложения» в Windows: только то, чем пользуется человек.</p>
+  </description>
+  <launchable type="desktop-id">io.github.appreestr.AppReestr.desktop</launchable>
+  <developer id="io.github.appreestr">
+    <name>AppReestr contributors</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-10-21"/>
+  </releases>
+</component>

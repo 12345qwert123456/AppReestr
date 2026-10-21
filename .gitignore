@@ -1,0 +1,7 @@
+/target/
+/tests/pkg/src/
+/tests/pkg/pkg/
+/tests/pkg/*.pkg.tar.*
+/packaging/src/
+/packaging/pkg/
+/packaging/*.pkg.tar.*

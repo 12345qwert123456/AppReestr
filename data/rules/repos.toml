@@ -1,0 +1,21 @@
+# How pacman repositories are presented. Glob patterns support `*`.
+
+# Arch Linux's own repositories.
+arch_official = [
+  "core", "extra", "multilib", "core-testing", "extra-testing", "multilib-testing",
+  "gnome-unstable", "kde-unstable", "testing", "community", "community-testing",
+]
+
+# Official repositories of Arch derivatives: pattern = label.
+[distro]
+"cachyos*" = "CachyOS"
+"endeavouros" = "EndeavourOS"
+"garuda" = "Garuda Linux"
+"manjaro*" = "Manjaro"
+"rebornos" = "RebornOS"
+"archcraft" = "Archcraft"
+"blendos" = "blendOS"
+
+# Distributions that rebuild core/extra/multilib under the same names (by /etc/os-release ID).
+[same_name_repos]
+manjaro = "Manjaro"

@@ -1,0 +1,7 @@
+.chip {
+  padding: 2px 12px;
+  min-height: 28px;
+}
+listview.navigation-sidebar > row {
+  border-radius: 8px;
+}

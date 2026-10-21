@@ -1,0 +1,15 @@
+[package]
+name = "appreestr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Installed applications registry for Arch Linux"
+
+[dependencies]
+appreestr-core.workspace = true
+relm4 = { version = "0.11", features = ["libadwaita", "gnome_49"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+nix.workspace = true
+anyhow.workspace = true
+notify.workspace = true

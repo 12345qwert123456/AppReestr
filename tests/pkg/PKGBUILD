@@ -1,0 +1,43 @@
+# Harmless test packages for checking removal end to end.
+#
+#   cd tests/pkg && makepkg
+#   sudo pacman -U --asdeps appreestr-test-dummy-dep-1-1-any.pkg.tar.zst
+#   sudo pacman -U appreestr-test-dummy-1-1-any.pkg.tar.zst
+#
+# AppReestr then lists "AppReestr Test Dummy". Uninstalling it must also remove
+# appreestr-test-dummy-dep (nothing else needs it), and nothing else.
+
+pkgbase=appreestr-test-dummy
+pkgname=(appreestr-test-dummy appreestr-test-dummy-dep)
+pkgver=1
+pkgrel=1
+arch=('any')
+license=('GPL-3.0-or-later')
+
+package_appreestr-test-dummy() {
+  pkgdesc="AppReestr test application (safe to remove)"
+  depends=('appreestr-test-dummy-dep')
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/appreestr-test-dummy" <<'SH'
+#!/bin/sh
+echo "AppReestr test dummy: nothing to see here."
+SH
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/appreestr-test-dummy.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=AppReestr Test Dummy
+Name[ru]=Тестовая программа AppReestr
+Comment=Safe to remove: used to test AppReestr
+Comment[ru]=Можно удалить: нужна для проверки AppReestr
+Exec=appreestr-test-dummy
+Icon=applications-utilities
+Terminal=true
+Categories=Utility;
+DESKTOP
+}
+
+package_appreestr-test-dummy-dep() {
+  pkgdesc="Dependency of the AppReestr test application (safe to remove)"
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/appreestr-test-dummy-dep/README" <<'TXT'
+Installed only as a dependency of appreestr-test-dummy.
+TXT
+}

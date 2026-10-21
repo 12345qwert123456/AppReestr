@@ -1,0 +1,42 @@
+# Classification rules: what is an "application".
+# Glob patterns support `*`. User additions go to ~/.config/appreestr/rules.toml (same keys).
+
+# Packages always treated as applications.
+app_packages = []
+
+# Packages never shown as applications, even when they ship a visible launcher.
+system_packages = []
+
+# Launchers (desktop file IDs) that are developer or system tools rather than programs people
+# recognise. A package whose only visible launchers match is not an application.
+system_desktop_ids = [
+  "avahi-discover.desktop",
+  "bssh.desktop",
+  "bvnc.desktop",
+  "lstopo.desktop",
+  "qv4l2.desktop",
+  "qvidcap.desktop",
+  "jconsole*.desktop",
+  "jshell*.desktop",
+  "java-*.desktop",
+  "cups.desktop",
+  "xgps.desktop",
+  "xgpsspeed.desktop",
+  "org.freedesktop.IBus.Setup.desktop",
+  "electron*.desktop",
+  "userapp-*.desktop",
+]
+
+# Packages without launchers that are never "console utilities" (system plumbing).
+system_name_patterns = [
+  "lib*", "lib32-*", "*-firmware", "linux-firmware*", "*-headers", "*-dkms", "*-ucode",
+  "ttf-*", "otf-*", "*-fonts", "*-fonts-*", "noto-fonts*", "adobe-source-*",
+  "python-*", "python2-*", "perl-*", "ruby-*", "haskell-*", "lua-*", "lua5*-*", "ocaml-*",
+  "*-docs", "*-doc", "*-keyring", "*-mirrorlist", "*-hooks", "*-settings",
+  "mesa*", "vulkan-*", "nvidia*", "opencl-*", "xf86-*", "xorg-server*", "pipewire*",
+  "wireplumber", "gst-*", "qt5-*", "qt6-*", "kf5-*", "kf6-*", "plymouth*", "grub*",
+  "*-plymouth-*", "systemd*", "*-meta",
+]
+
+# Package groups whose members are base system, never console utilities.
+system_groups = ["base", "base-devel"]

@@ -1,0 +1,56 @@
+# Builds AppReestr from this source tree:  cd packaging && makepkg -si
+# For the AUR, replace the local source with the public git repository.
+
+pkgname=appreestr-git
+_pkgname=appreestr
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Installed applications registry for Arch Linux: one list from all sources, safe removal"
+arch=('x86_64' 'aarch64')
+license=('GPL-3.0-or-later')
+depends=('gtk4' 'libadwaita' 'pacman' 'polkit' 'glib2' 'gcc-libs' 'glibc')
+makedepends=('cargo' 'gettext')
+optdepends=(
+  'flatpak: show and remove Flatpak applications'
+  'snapd: show and remove Snap packages'
+  'xdg-desktop-portal-gtk: follow the system light/dark style on window managers'
+)
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+options=('!lto')
+
+_srcroot() { realpath "$startdir/.."; }
+
+pkgver() {
+  cd "$(_srcroot)"
+  if git rev-parse --git-dir >/dev/null 2>&1 && git rev-parse HEAD >/dev/null 2>&1; then
+    printf "0.1.0.r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  else
+    printf "0.1.0"
+  fi
+}
+
+prepare() {
+  cd "$(_srcroot)"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$(_srcroot)"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  make build PREFIX=/usr
+}
+
+check() {
+  cd "$(_srcroot)"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  cargo test --workspace --locked --release
+}
+
+package() {
+  cd "$(_srcroot)"
+  make install PREFIX=/usr DESTDIR="$pkgdir" TARGET="$srcdir/target"
+}

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=AppReestr
+Name[ru]=AppReestr
+GenericName=Installed Applications
+GenericName[ru]=Установленные приложения
+Comment=See every installed application, where it came from, and remove it safely
+Comment[ru]=Все установленные программы: откуда они и как их безопасно удалить
+Exec=appreestr
+Icon=io.github.appreestr.AppReestr
+Terminal=false
+Categories=GTK;System;PackageManager;
+Keywords=uninstall;remove;applications;packages;flatpak;appimage;aur;pacman;
+Keywords[ru]=удалить;удаление;программы;приложения;пакеты;установленные;
+StartupNotify=true

@@ -1,0 +1,10 @@
+[package]
+name = "appreestr-helper"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Privileged helper of AppReestr, run through pkexec. Removes only what it re-validates."
+
+[dependencies]
+appreestr-core.workspace = true
+nix.workspace = true

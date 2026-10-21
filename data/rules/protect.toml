@@ -1,0 +1,35 @@
+# Protection rules. Packages matching `critical` can never be removed, and neither can anything
+# they depend on. Kernels, the running desktop session and the display manager are detected
+# automatically and added to this list.
+critical = [
+  "base", "filesystem", "glibc", "pacman", "pacman-mirrorlist", "systemd", "systemd-libs",
+  "polkit", "sudo", "opendoas", "mkinitcpio", "dracut", "booster", "grub", "limine", "refind",
+  "efibootmgr", "*-keyring", "*-mirrorlist", "appreestr", "appreestr-git",
+]
+
+# Process names of compositors, window managers and desktop shells.
+session_processes = [
+  "Hyprland", "hyprland", "sway", "kwin_wayland", "kwin_x11", "plasmashell", "gnome-shell",
+  "mutter", "xfwm4", "xfce4-session", "xfce4-panel", "cinnamon", "mate-session", "marco",
+  "openbox", "i3", "river", "niri", "labwc", "wayfire", "Xorg", "Xwayland", "budgie-wm",
+  "lxqt-session", "cosmic-comp", "cosmic-session", "dwl", "qtile", "awesome", "bspwm", "dwm",
+  "herbstluftwm", "xmonad", "fluxbox", "icewm", "enlightenment", "miracle-wm", "uwsm",
+]
+
+# Process names of desktop components (bars, launchers, notifications, lock screens): removing
+# them while they run is allowed but warned about.
+desktop_components = [
+  "waybar", "ashell", "hyprpanel", "quickshell", "ags", "eww", "swaync", "mako", "dunst",
+  "rofi", "wofi", "fuzzel", "walker", "hyprpaper", "swww-daemon", "hypridle", "hyprlock",
+  "swaylock", "swayidle", "nm-applet", "blueman-applet", "polybar", "lemonbar", "picom",
+  "quickshell", "qs",
+]
+
+# Process names of polkit authentication agents.
+polkit_agents = [
+  "hyprpolkitagent", "polkit-gnome-authentication-agent-1", "polkit-kde-authentication-agent-1",
+  "lxqt-policykit-agent", "polkit-mate-authentication-agent-1", "xfce-polkit", "mate-polkit",
+  "lxpolkit", "soteria", "polkit-efl-authentication-agent-1", "cosmic-osd",
+  # Desktop shells with a built-in agent.
+  "noctalia",
+]

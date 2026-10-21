@@ -1,0 +1,881 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: appreestr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: crates/app/src/details.rs:47 crates/app/src/details.rs:50
+msgid "together with the system"
+msgstr ""
+
+#: crates/app/src/details.rs:51
+msgid "installed on request"
+msgstr ""
+
+#: crates/app/src/details.rs:53
+msgid "came with {}"
+msgstr ""
+
+#: crates/app/src/details.rs:55
+msgid "built with {}"
+msgstr ""
+
+#: crates/app/src/details.rs:56
+msgid "from a package file"
+msgstr ""
+
+#: crates/app/src/details.rs:65 crates/app/src/details.rs:175 crates/app/src/uninstall.rs:349
+msgid "Uninstall"
+msgstr ""
+
+#: crates/app/src/details.rs:73 crates/app/src/window.rs:375
+msgid "Source"
+msgstr ""
+
+#: crates/app/src/details.rs:75
+msgid "Version"
+msgstr ""
+
+#: crates/app/src/details.rs:78 crates/app/src/window.rs:375
+msgid "Size"
+msgstr ""
+
+#: crates/app/src/details.rs:85
+msgid "Installed"
+msgstr ""
+
+#: crates/app/src/details.rs:88
+msgid "Updated"
+msgstr ""
+
+#: crates/app/src/details.rs:91
+msgid "Technical details"
+msgstr ""
+
+#: crates/app/src/details.rs:93
+msgid "Package"
+msgstr ""
+
+#: crates/app/src/details.rs:94
+msgid "Flatpak reference"
+msgstr ""
+
+#: crates/app/src/details.rs:95
+msgid "Snap"
+msgstr ""
+
+#: crates/app/src/details.rs:96
+msgid "File"
+msgstr ""
+
+#: crates/app/src/details.rs:100
+msgid "Repository"
+msgstr ""
+
+#: crates/app/src/details.rs:104
+msgid "Packager"
+msgstr ""
+
+#: crates/app/src/details.rs:107
+msgid "Built"
+msgstr ""
+
+#: crates/app/src/details.rs:110
+msgid "Depends on"
+msgstr ""
+
+#: crates/app/src/details.rs:113
+msgid "Required by"
+msgstr ""
+
+#: crates/app/src/details.rs:117
+msgid "Install command"
+msgstr ""
+
+#: crates/app/src/details.rs:120
+msgid "Website"
+msgstr ""
+
+#: crates/app/src/details.rs:123
+msgid "Open website"
+msgstr ""
+
+#: crates/app/src/details.rs:192
+msgid "Installed in {} ways. Each one can be removed separately."
+msgstr ""
+
+#: crates/app/src/details.rs:200
+msgid "Installation {}: {}"
+msgstr ""
+
+#: crates/app/src/details.rs:202
+msgid "Installation"
+msgstr ""
+
+#: crates/app/src/details.rs:210
+msgid "Files"
+msgstr ""
+
+#: crates/app/src/details.rs:215
+msgid "Open in file manager"
+msgstr ""
+
+#: crates/app/src/details.rs:223
+msgid "Installed along with it"
+msgstr ""
+
+#: crates/app/src/details.rs:224
+msgid "Calculating…"
+msgstr ""
+
+#: crates/app/src/details.rs:232
+msgid "Launchers"
+msgstr ""
+
+#: crates/app/src/details.rs:234
+msgid "hidden"
+msgstr ""
+
+#: crates/app/src/details.rs:243
+msgid "Why is it listed here?"
+msgstr ""
+
+#: crates/app/src/details.rs:245 crates/app/src/row.rs:46
+msgid "Undo My Choice"
+msgstr ""
+
+#: crates/app/src/details.rs:246 crates/app/src/row.rs:47
+msgid "Hide From List"
+msgstr ""
+
+#: crates/app/src/details.rs:247 crates/app/src/row.rs:48
+msgid "Show as Application"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:14
+msgid "All installed applications in one list: where they came from and how to remove them safely."
+msgstr ""
+
+#: crates/app/src/dialogs.rs:23
+msgid "List"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:25
+msgid "Search"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:26
+msgid "Open details"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:27
+msgid "Uninstall the selected application"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:28
+msgid "Back or clear the search"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:29
+msgid "Refresh the list"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:33
+msgid "Filters"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:35
+msgid "Show system components"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:36
+msgid "Show command-line tools"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:37
+msgid "All sources"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:38
+msgid "Filter by source"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:42
+msgid "General"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:44
+msgid "Keyboard shortcuts"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:45 crates/app/src/window.rs:365
+msgid "Preferences"
+msgstr ""
+
+#: crates/app/src/dialogs.rs:46 crates/app/src/uninstall.rs:68 crates/app/src/uninstall.rs:417
+msgid "Close"
+msgstr ""
+
+#: crates/app/src/prefs.rs:18
+msgid "Appearance"
+msgstr ""
+
+#: crates/app/src/prefs.rs:19
+msgid "Follow the system"
+msgstr ""
+
+#: crates/app/src/prefs.rs:19
+msgid "Light"
+msgstr ""
+
+#: crates/app/src/prefs.rs:19
+msgid "Dark"
+msgstr ""
+
+#: crates/app/src/prefs.rs:20
+msgid "Style"
+msgstr ""
+
+#: crates/app/src/prefs.rs:39
+msgid "AppImage Folders"
+msgstr ""
+
+#: crates/app/src/prefs.rs:40
+msgid "AppImage files are looked for in these folders. Files started from the menu are found anywhere."
+msgstr ""
+
+#: crates/app/src/prefs.rs:49
+msgid "Add Folder…"
+msgstr ""
+
+#: crates/app/src/prefs.rs:62
+msgid "Stop looking here"
+msgstr ""
+
+#: crates/app/src/prefs.rs:80
+msgid "Choose a Folder"
+msgstr ""
+
+#: crates/app/src/removal.rs:108
+msgid "No authentication agent is running; asking for the password here."
+msgstr ""
+
+#: crates/app/src/removal.rs:118
+msgid "No authentication agent is available to ask for the password."
+msgstr ""
+
+#: crates/app/src/removal.rs:139
+msgid "Removing packages…"
+msgstr ""
+
+#: crates/app/src/removal.rs:149 crates/app/src/removal.rs:161
+msgid "Removing the Flatpak application…"
+msgstr ""
+
+#: crates/app/src/removal.rs:153
+msgid "Removing the Snap package…"
+msgstr ""
+
+#: crates/app/src/removal.rs:157
+msgid "Removing files…"
+msgstr ""
+
+#: crates/app/src/removal.rs:165 crates/app/src/removal.rs:176
+msgid "flatpak exited with code {}"
+msgstr ""
+
+#: crates/app/src/removal.rs:168 crates/app/src/removal.rs:172
+msgid "Removing unused Flatpak runtimes…"
+msgstr ""
+
+#: crates/app/src/removal.rs:179
+msgid "Moving files to the trash…"
+msgstr ""
+
+#: crates/app/src/removal.rs:185
+msgid "Moved to the trash: {}"
+msgstr ""
+
+#: crates/app/src/removal.rs:188
+msgid "Cannot move {} to the trash: {}"
+msgstr ""
+
+#: crates/app/src/removal.rs:227
+msgid "Authentication was cancelled."
+msgstr ""
+
+#: crates/app/src/removal.rs:228
+msgid "Authentication failed: wrong password, or no authentication agent is available."
+msgstr ""
+
+#: crates/app/src/removal.rs:229
+msgid "Internal error: the request was rejected as invalid."
+msgstr ""
+
+#: crates/app/src/removal.rs:230
+msgid "It is no longer installed."
+msgstr ""
+
+#: crates/app/src/removal.rs:231
+msgid "It is protected: the system or the desktop needs it."
+msgstr ""
+
+#: crates/app/src/removal.rs:232
+msgid "The system changed since you confirmed. Check again and repeat."
+msgstr ""
+
+#: crates/app/src/removal.rs:233
+msgid "Another installation or update is running. Wait for it to finish and try again."
+msgstr ""
+
+#: crates/app/src/removal.rs:234
+msgid "The package manager reported an error. See the details."
+msgstr ""
+
+#: crates/app/src/removal.rs:235
+msgid "These files cannot be removed from here."
+msgstr ""
+
+#: crates/app/src/removal.rs:236
+msgid "Unexpected error (code {})"
+msgstr ""
+
+#: crates/app/src/removal.rs:326
+msgid "Wrong password."
+msgstr ""
+
+#: crates/app/src/removal.rs:342
+msgid "Enter the administrator password to continue."
+msgstr ""
+
+#: crates/app/src/removal.rs:344
+msgid "Enter the password of {} to continue."
+msgstr ""
+
+#: crates/app/src/row.rs:42 crates/app/src/uninstall.rs:416
+msgid "Details"
+msgstr ""
+
+#: crates/app/src/row.rs:43
+msgid "Open Location"
+msgstr ""
+
+#: crates/app/src/row.rs:52
+msgid "Uninstall…"
+msgstr ""
+
+#: crates/app/src/row.rs:91
+msgid "Actions"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:93
+msgid "“{}” is managed by {}"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:94
+msgid "Remove it from the program that created it. AppReestr only shows such launchers."
+msgstr ""
+
+#: crates/app/src/uninstall.rs:108
+msgid "Uninstall “{}”"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:109
+msgid "It is installed in several ways. Choose what to remove."
+msgstr ""
+
+#: crates/app/src/uninstall.rs:130 crates/app/src/uninstall.rs:348 crates/app/src/uninstall.rs:527 crates/app/src/uninstall.rs:619
+msgid "Cancel"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:131
+msgid "Continue"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:188
+msgid "{} is needed by: {}. Remove those first, or keep it."
+msgstr ""
+
+#: crates/app/src/uninstall.rs:211
+msgid "Cannot check “{}”"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:217
+msgid "“{}” cannot be uninstalled"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:241 crates/app/src/uninstall.rs:613
+msgid "Packages"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:242
+msgid "{} · {}"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:305
+msgid "Also remove its settings and data ({})"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:309
+msgid "Settings, data and cache"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:310
+msgid "Moved to the trash, so they can be restored"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:315
+msgid "large"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:317
+msgid "possibly unrelated"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:341
+msgid "This frees {}."
+msgstr ""
+
+#: crates/app/src/uninstall.rs:346
+msgid "Uninstall “{}”?"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:406
+msgid "Preparing…"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:432
+msgid "Uninstalling “{}”"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:486
+msgid "“{}” was uninstalled"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:521
+msgid "Authentication Required"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:522
+msgid "Password"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:528
+msgid "Authenticate"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:561
+msgid "Review"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:571
+msgid "Flatpak runtimes may be unused now"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:572
+msgid "Clean Up"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:601
+msgid "Cannot check unused components"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:604
+msgid "Unused components cannot be removed"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:607
+msgid "Remove unused components?"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:608
+msgid "Nothing uses them any more. This frees {}."
+msgstr ""
+
+#: crates/app/src/uninstall.rs:620
+msgid "Remove"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:628
+msgid "Unused components"
+msgstr ""
+
+#: crates/app/src/uninstall.rs:683
+msgid "Nothing else: it brought no components of its own."
+msgstr ""
+
+#: crates/app/src/uninstall.rs:687
+msgid "Removed together with it, because nothing else needs them."
+msgstr ""
+
+#: crates/app/src/uninstall.rs:234
+msgid "{} component that nothing else needs will be removed too."
+msgid_plural "{} components that nothing else needs will be removed too."
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/app/src/uninstall.rs:558
+msgid "{} unused component left"
+msgid_plural "{} unused components left"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/app/src/uninstall.rs:689
+msgid "{} component"
+msgid_plural "{} components"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/app/src/window.rs:170
+msgid "All"
+msgstr ""
+
+#: crates/app/src/window.rs:360
+msgid "Show System Components"
+msgstr ""
+
+#: crates/app/src/window.rs:361
+msgid "Show Command-Line Tools"
+msgstr ""
+
+#: crates/app/src/window.rs:364
+msgid "Refresh"
+msgstr ""
+
+#: crates/app/src/window.rs:366
+msgid "Keyboard Shortcuts"
+msgstr ""
+
+#: crates/app/src/window.rs:367
+msgid "About AppReestr"
+msgstr ""
+
+#: crates/app/src/window.rs:375
+msgid "Name"
+msgstr ""
+
+#: crates/app/src/window.rs:375
+msgid "Installation Date"
+msgstr ""
+
+#: crates/app/src/window.rs:425
+msgid "Installed applications"
+msgstr ""
+
+#: crates/app/src/window.rs:440
+msgid "Search applications"
+msgstr ""
+
+#: crates/app/src/window.rs:459
+msgid "Updating the list…"
+msgstr ""
+
+#: crates/app/src/window.rs:464
+msgid "Main Menu"
+msgstr ""
+
+#: crates/app/src/window.rs:470
+msgid "Sort"
+msgstr ""
+
+#: crates/app/src/window.rs:512
+msgid "Looking for installed applications…"
+msgstr ""
+
+#: crates/app/src/window.rs:518
+msgid "Nothing Found"
+msgstr ""
+
+#: crates/app/src/window.rs:519
+msgid "Try a different search, or show system components and command-line tools from the main menu."
+msgstr ""
+
+#: crates/app/src/window.rs:537
+msgid "Installed Applications"
+msgstr ""
+
+#: crates/app/src/window.rs:660
+msgid "Unused Flatpak runtimes"
+msgstr ""
+
+#: crates/app/src/window.rs:689
+msgid "“{}” is hidden. It stays under system components."
+msgstr ""
+
+#: crates/app/src/window.rs:690
+msgid "“{}” is now shown as an application"
+msgstr ""
+
+#: crates/app/src/window.rs:691
+msgid "“{}” is classified automatically again"
+msgstr ""
+
+#: crates/app/src/window.rs:693
+msgid "Undo"
+msgstr ""
+
+#: crates/app/src/window.rs:781
+msgid "Some sources could not be read: {}"
+msgstr ""
+
+#: crates/app/src/window.rs:182
+msgid "{} application"
+msgid_plural "{} applications"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/reasons.rs:10
+msgid " and {} more"
+msgstr ""
+
+#: crates/core/src/reasons.rs:17
+msgid "You marked it as an application"
+msgstr ""
+
+#: crates/core/src/reasons.rs:18
+msgid "You hid it from the list"
+msgstr ""
+
+#: crates/core/src/reasons.rs:19
+msgid "Listed as an application by the rules"
+msgstr ""
+
+#: crates/core/src/reasons.rs:20
+msgid "Listed as a system component by the rules ({})"
+msgstr ""
+
+#: crates/core/src/reasons.rs:21
+msgid "Describes itself as a desktop application"
+msgstr ""
+
+#: crates/core/src/reasons.rs:22
+msgid "Describes itself as a command-line application"
+msgstr ""
+
+#: crates/core/src/reasons.rs:23
+msgid "Describes itself as a system component ({})"
+msgstr ""
+
+#: crates/core/src/reasons.rs:24
+msgid "Has a launcher in the application menu"
+msgstr ""
+
+#: crates/core/src/reasons.rs:25
+msgid "Its launchers are hidden from the menu"
+msgstr ""
+
+#: crates/core/src/reasons.rs:26
+msgid "Installed on purpose, not as a dependency"
+msgstr ""
+
+#: crates/core/src/reasons.rs:27
+msgid "Installed as a dependency"
+msgstr ""
+
+#: crates/core/src/reasons.rs:28
+msgid "Installed as a part of: {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:29
+msgid "Installed as part of the set: {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:30
+msgid "Was installed as a dependency, nothing needs it any more"
+msgstr ""
+
+#: crates/core/src/reasons.rs:31
+msgid "Command-line tool: {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:32
+msgid "Installed together with the operating system"
+msgstr ""
+
+#: crates/core/src/reasons.rs:33
+msgid "System component by name ({})"
+msgstr ""
+
+#: crates/core/src/reasons.rs:34
+msgid "Part of the base system"
+msgstr ""
+
+#: crates/core/src/reasons.rs:35
+msgid "Background service"
+msgstr ""
+
+#: crates/core/src/reasons.rs:36
+msgid "Linux kernel"
+msgstr ""
+
+#: crates/core/src/reasons.rs:37
+msgid "Has no programs to run (library or data)"
+msgstr ""
+
+#: crates/core/src/reasons.rs:38
+msgid "Flatpak application"
+msgstr ""
+
+#: crates/core/src/reasons.rs:39
+msgid "Shared Flatpak runtime used by applications"
+msgstr ""
+
+#: crates/core/src/reasons.rs:40
+msgid "AppImage file"
+msgstr ""
+
+#: crates/core/src/reasons.rs:41
+msgid "Snap application"
+msgstr ""
+
+#: crates/core/src/reasons.rs:42
+msgid "Snap base or runtime"
+msgstr ""
+
+#: crates/core/src/reasons.rs:43
+msgid "Installed manually, outside any package manager"
+msgstr ""
+
+#: crates/core/src/reasons.rs:44 crates/core/src/reasons.rs:97
+msgid "Launcher created by {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:52
+msgid "a game launcher"
+msgstr ""
+
+#: crates/core/src/reasons.rs:53
+msgid "a web browser"
+msgstr ""
+
+#: crates/core/src/reasons.rs:63
+msgid "Local package"
+msgstr ""
+
+#: crates/core/src/reasons.rs:67 crates/core/src/reasons.rs:109
+msgid "Manual"
+msgstr ""
+
+#: crates/core/src/reasons.rs:75 crates/core/src/reasons.rs:76
+msgid "From the official {} repositories"
+msgstr ""
+
+#: crates/core/src/reasons.rs:77
+msgid "From a third-party repository: {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:79
+msgid "From the AUR (community repository), built with {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:81
+msgid "Built locally, most likely from the AUR"
+msgstr ""
+
+#: crates/core/src/reasons.rs:82
+msgid "Installed from a package file, or removed from the repositories"
+msgstr ""
+
+#: crates/core/src/reasons.rs:85
+msgid "for this user"
+msgstr ""
+
+#: crates/core/src/reasons.rs:86
+msgid "for all users"
+msgstr ""
+
+#: crates/core/src/reasons.rs:89
+msgid "Flatpak from {}, {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:90
+msgid "Flatpak, {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:93
+msgid "AppImage file: a self-contained program"
+msgstr ""
+
+#: crates/core/src/reasons.rs:94
+msgid "Snap from {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:95
+msgid "Snap package"
+msgstr ""
+
+#: crates/core/src/reasons.rs:96
+msgid "Installed manually (unpacked archive or installer)"
+msgstr ""
+
+#: crates/core/src/reasons.rs:103
+msgid "Official"
+msgstr ""
+
+#: crates/core/src/reasons.rs:104
+msgid "Third-party"
+msgstr ""
+
+#: crates/core/src/reasons.rs:122
+msgid "B"
+msgstr ""
+
+#: crates/core/src/reasons.rs:123
+msgid "kB"
+msgstr ""
+
+#: crates/core/src/reasons.rs:124
+msgid "MB"
+msgstr ""
+
+#: crates/core/src/reasons.rs:125
+msgid "GB"
+msgstr ""
+
+#: crates/core/src/reasons.rs:126
+msgid "TB"
+msgstr ""
+
+#: crates/core/src/reasons.rs:136
+msgid "{} is an essential part of the system."
+msgstr ""
+
+#: crates/core/src/reasons.rs:137
+msgid "{} is a Linux kernel the system boots with."
+msgstr ""
+
+#: crates/core/src/reasons.rs:138
+msgid "{} is held by the package manager configuration."
+msgstr ""
+
+#: crates/core/src/reasons.rs:139
+msgid "Your desktop is running on it right now ({})."
+msgstr ""
+
+#: crates/core/src/reasons.rs:140
+msgid "It is the login screen of this computer ({})."
+msgstr ""
+
+#: crates/core/src/reasons.rs:141
+msgid "It asks for passwords in your session ({})."
+msgstr ""
+
+#: crates/core/src/reasons.rs:144
+msgid "{} needs it. {}"
+msgstr ""
+
+#: crates/core/src/reasons.rs:152
+msgid "{} is running now. Save your work and close it first."
+msgstr ""
+
+#: crates/core/src/reasons.rs:154
+msgid "{} is part of your desktop ({}); it will disappear from the screen."
+msgstr ""
+
+#: crates/core/src/reasons.rs:157
+msgid "{} runs as a background service ({}); it will stop working."
+msgstr ""
+
+#: crates/core/src/reasons.rs:159
+msgid "Some features of these programs will stop working: {}"
+msgstr ""
