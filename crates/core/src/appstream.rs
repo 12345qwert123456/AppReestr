@@ -1,8 +1,8 @@
 //! AppStream metainfo files (`/usr/share/metainfo/*.xml`).
 
 use crate::model::{ComponentKind, MetaInfo};
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
 
 fn kind_from_attr(t: &str) -> ComponentKind {
     match t {
@@ -55,13 +55,13 @@ pub fn parse(xml: &str, locale: Option<&str>) -> Option<MetaInfo> {
     loop {
         match reader.read_event() {
             Ok(Event::Start(e)) => {
-                let tag = String::from_utf8_lossy(e.local_name().as_ref()).into_owned();
+                let tag = e.local_name().as_ref().to_string();
                 if stack.is_empty() && (tag == "component" || tag == "application") {
                     let t = e
                         .try_get_attribute("type")
                         .ok()
                         .flatten()
-                        .and_then(|a| a.unescape_value().ok().map(|v| v.into_owned()))
+                        .and_then(|a| a.normalized_value(XmlVersion::Implicit1_0).ok().map(|v| v.into_owned()))
                         .unwrap_or_else(|| "generic".into());
                     kind =
                         Some(if tag == "application" { ComponentKind::DesktopApplication } else { kind_from_attr(&t) });
@@ -69,22 +69,20 @@ pub fn parse(xml: &str, locale: Option<&str>) -> Option<MetaInfo> {
                 cur_lang = e
                     .attributes()
                     .flatten()
-                    .find(|a| a.key.as_ref() == b"xml:lang")
-                    .and_then(|a| a.unescape_value().ok().map(|v| v.into_owned()));
+                    .find(|a| a.key.as_ref() == "xml:lang")
+                    .and_then(|a| a.normalized_value(XmlVersion::Implicit1_0).ok().map(|v| v.into_owned()));
                 cur_launchable_desktop = tag == "launchable"
-                    && e.try_get_attribute("type").ok().flatten().is_some_and(|a| a.value.as_ref() == b"desktop-id");
+                    && e.try_get_attribute("type").ok().flatten().is_some_and(|a| a.value.as_ref() == "desktop-id");
                 text.clear();
                 stack.push(tag);
             }
             Ok(Event::Text(t)) => {
-                if let Ok(s) = t.decode() {
-                    text.push_str(&s);
-                }
+                text.push_str(&t.xml_content(XmlVersion::Implicit1_0));
             }
             Ok(Event::GeneralRef(r)) => {
                 if let Ok(Some(c)) = r.resolve_char_ref() {
                     text.push(c);
-                } else if let Some(c) = r.decode().ok().and_then(|n| resolve_entity(&n)) {
+                } else if let Some(c) = resolve_entity(&r) {
                     text.push(c);
                 }
             }
