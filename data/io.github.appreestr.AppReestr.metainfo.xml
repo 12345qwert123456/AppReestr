@@ -18,6 +18,14 @@
     <p xml:lang="ru">AppReestr показывает установленные в Arch Linux программы одним списком, как
       «Установленные приложения» в Windows: только то, чем пользуется человек.</p>
   </description>
+  <url type="homepage">https://github.com/12345qwert123456/AppReestr</url>
+  <url type="bugtracker">https://github.com/12345qwert123456/AppReestr/issues</url>
+  <url type="vcs-browser">https://github.com/12345qwert123456/AppReestr</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/12345qwert123456/AppReestr/main/docs/screenshots/main.png</image>
+    </screenshot>
+  </screenshots>
   <launchable type="desktop-id">io.github.appreestr.AppReestr.desktop</launchable>
   <developer id="io.github.appreestr">
     <name>AppReestr contributors</name>

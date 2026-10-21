@@ -1,116 +1,124 @@
 # AppReestr
 
-Реестр установленных приложений для Arch Linux и производных (CachyOS, Manjaro, EndeavourOS).
-Как «Установленные приложения» в Windows: один список программ из всех источников, видно,
-откуда каждая взялась, и её можно безопасно удалить.
+**English** | [Русский](README.ru.md)
 
-## Что умеет
+[![CI](https://github.com/12345qwert123456/AppReestr/actions/workflows/ci.yml/badge.svg)](https://github.com/12345qwert123456/AppReestr/actions/workflows/ci.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 
-- **Один список** из всех источников: официальные репозитории Arch, репозитории дистрибутива
-  (CachyOS, EndeavourOS, Manjaro), сторонние репозитории, AUR, Flatpak, AppImage, Snap и ручные
-  установки (`/opt`, `/usr/local/bin`, распакованные архивы в домашней папке).
-- **Только приложения.** Библиотеки, шрифты, ядра, драйверы и службы скрыты. Их показывает
-  переключатель «Показать системное» (Ctrl+H), консольные утилиты — переключатель
-  «Консольные утилиты» (Ctrl+J).
-- **Одна программа — одна строка**, даже если она установлена несколькими способами (например,
-  из репозитория и из Flatpak).
-- **Карточка приложения**:
-  - откуда установлено, когда и какой командой (по `pacman.log`);
-  - где лежат файлы, что пришло вместе с программой;
-  - почему программа попала в список.
-- **Безопасное удаление** штатными средствами: `pacman -Rs`, `flatpak uninstall`, `snap remove`.
-  - Перед удалением видно, что уйдёт вместе с программой.
-  - Ядро, базовая система, загрузчик, текущий рабочий стол и экран входа защищены.
-  - Каскадное удаление (`-Rc`) не используется никогда.
-- **Массовое удаление.** Кнопка с галочкой в заголовке включает режим выбора: отметьте несколько
-  программ и нажмите «Удалить…». Программы, которые нельзя удалить (защищены или нужны другим),
-  пропускаются с объяснением, остальные уходят одной операцией.
-- **Режим администратора.** Кнопка с замком в заголовке перезапускает AppReestr от root: пароль
-  спрашивается один раз, после этого удаление не просит его. Защита системы при этом не
-  отключается.
-- **Опасная зона** (Настройки → «Опасная зона» и карточка пакета): принудительное удаление
-  любого пакета, как `pacman -Rdd`. Зависимости и защита игнорируются, перед удалением показано,
-  что сломается, а подтвердить нужно вводом названия пакета.
-- **Остатки** (настройки, данные, кэш в домашней папке) по желанию отправляются в корзину,
-  с предпросмотром.
-- **Ручная разметка**: «скрыть из списка» и «показывать как приложение» запоминаются.
-- **Ненужные компоненты** после удаления: предлагается убрать то, что больше никому не нужно.
-- **Без сети и телеметрии.** Для просмотра не нужны права администратора.
-- Полностью управляется с клавиатуры, следует светлой/тёмной теме системы, интерфейс на
-  русском и английском.
+![AppReestr main window](docs/screenshots/main.png)
 
-## Сборка и установка
+An installed-applications registry for Arch Linux and derivatives (CachyOS, Manjaro, EndeavourOS).
+Like "Installed apps" in Windows: one list of programs from every source, a clear view of where
+each one came from, and a safe way to remove it.
 
-Зависимости: `rust`, `gtk4`, `libadwaita`, `pacman` (libalpm), `polkit`, `gettext`.
+## Features
+
+- **One list** from every source: official Arch repositories, distribution repositories (CachyOS,
+  EndeavourOS, Manjaro), third-party repositories, AUR, Flatpak, AppImage, Snap and manual
+  installs (`/opt`, `/usr/local/bin`, archives unpacked in the home folder).
+- **Applications only.** Libraries, fonts, kernels, drivers and services are hidden. Show them with
+  the "Show System Components" toggle (Ctrl+H); console utilities have their own toggle (Ctrl+J).
+- **One program, one row**, even when it is installed in several ways (for example from a
+  repository and from Flatpak).
+- **App details**:
+  - where it was installed from, when and with which command (read from `pacman.log`);
+  - where its files are and what came along with it;
+  - why it is in the list.
+- **Safe removal** with the standard tools: `pacman -Rs`, `flatpak uninstall`, `snap remove`.
+  - You see what goes away with the program before anything is removed.
+  - The kernel, the base system, the bootloader, the running desktop and the login screen are protected.
+  - Cascade removal (`-Rc`) is never used.
+- **Bulk removal.** The check-mark button in the header bar turns on selection mode: tick several
+  programs and press "Uninstall…". Programs that cannot be removed (protected or needed by others)
+  are skipped with an explanation; the rest go in one operation.
+- **Administrator mode.** The lock button in the header bar restarts AppReestr as root: the password
+  is asked once, and removal does not ask for it again. System protection stays on.
+- **Danger Zone** (Preferences → "Danger Zone" and the package details): force-remove any package,
+  like `pacman -Rdd`. Dependencies and protection are ignored; what will break is shown first, and
+  you confirm by typing the package name.
+- **Leftovers** (settings, data and cache in the home folder) can be sent to the trash, with a
+  preview.
+- **Manual marks**: "hide from the list" and "show as an application" are remembered.
+- **Unneeded components** after removal: AppReestr offers to clean up what nothing needs any more.
+- **No network, no telemetry.** Browsing needs no administrator rights.
+- Fully keyboard-driven, follows the system light/dark theme, available in English and Russian.
+
+## Build and install
+
+Dependencies: `rust`, `gtk4`, `libadwaita`, `pacman` (libalpm), `polkit`, `gettext`.
 
 ```bash
+git clone https://github.com/12345qwert123456/AppReestr
+cd AppReestr
 make
 sudo make install
 ```
 
-Или пакетом:
+Or as a package:
 
 ```bash
 cd packaging && makepkg -si
 ```
 
-Запуск из дерева исходников (без установки): `cargo run -p appreestr`. В отладочной сборке
-удаление использует `target/debug/appreestr-helper`; pkexec спросит пароль с общим сообщением,
-потому что политика polkit ещё не установлена.
+To run from the source tree without installing: `cargo run -p appreestr`. A debug build removes
+packages through `target/debug/appreestr-helper`; pkexec asks for the password with a generic
+message because the polkit policy is not installed.
 
-## Тайлинговые оконные менеджеры (Hyprland, Sway, i3)
+## Tiling window managers (Hyprland, Sway, i3)
 
-- **Пароль администратора.** Пароль спрашивает агент polkit вашего сеанса (hyprpolkitagent,
-  polkit-gnome, встроенный агент оболочки вроде Noctalia и т. п.). Если агента в сеансе нет и
-  `pkexec` сообщает об этом, AppReestr запускает штатный `pkttyagent` только для себя и
-  показывает окно ввода пароля сам. Пароль передаётся polkit напрямую и нигде не сохраняется.
-- **Светлая и тёмная тема** берутся из портала: нужен `xdg-desktop-portal-gtk` (или
-  `-gnome`/`-kde`). Тему можно и выбрать вручную в настройках (Ctrl+,).
+- **Administrator password.** The polkit agent of your session asks for it (hyprpolkitagent,
+  polkit-gnome, a shell-integrated agent such as Noctalia, and so on). If there is no agent in the
+  session and `pkexec` says so, AppReestr starts the standard `pkttyagent` for itself only and shows
+  the password dialog on its own. The password goes straight to polkit and is never stored.
+- **Light and dark theme** come from the desktop portal: you need `xdg-desktop-portal-gtk` (or
+  `-gnome`/`-kde`). You can also pick the theme in Preferences (Ctrl+,).
 
-## Режим администратора
+## Administrator mode
 
-«Перезапустить от администратора» запускает `pkexec appreestr`; окно открывается заново, а старое
-закрывается. Приложение работает от root, но список и настройки берутся из домашней папки
-вашего пользователя (`PKEXEC_UID`), файлы в ней записываются от вашего имени, а корзина и
-пользовательский Flatpak обслуживаются от вашего имени. Помощник `appreestr-helper` по-прежнему
-проверяет всё сам и запускается напрямую, без pkexec. Политика polkit `…run-as-admin`
-устанавливается вместе с программой; из дерева исходников pkexec спросит пароль с общим сообщением.
+"Restart as Administrator…" runs `pkexec appreestr`; the window reopens and the old one closes. The
+app runs as root, but the list and settings are taken from the home folder of your user
+(`PKEXEC_UID`), files there are written as you, and the trash and user Flatpak are handled as you.
+The `appreestr-helper` still validates everything itself and is started directly, without pkexec.
+The polkit policy `…run-as-admin` is installed with the program; from the source tree pkexec asks
+for the password with a generic message.
 
-## Горячие клавиши
+## Keyboard shortcuts
 
-| Клавиши | Действие |
+| Keys | Action |
 |---|---|
-| набор текста / Ctrl+F | поиск |
-| ↑ ↓, Enter | выбор, карточка приложения |
-| Delete | удалить выбранное (в режиме выбора: все отмеченные) |
-| Esc, Alt+← | назад / выйти из режима выбора / очистить поиск |
-| Alt+1…8 | фильтр по источнику |
-| Ctrl+H / Ctrl+J | системное / консольные утилиты |
-| F5, Ctrl+R | обновить список |
-| Ctrl+, | настройки |
-| Ctrl+? | все горячие клавиши |
+| typing / Ctrl+F | search |
+| ↑ ↓, Enter | select, app details |
+| Delete | uninstall the selection (in selection mode: all ticked) |
+| Esc, Alt+← | back / leave selection mode / clear search |
+| Alt+1…8 | filter by source |
+| Ctrl+H / Ctrl+J | system / console utilities |
+| F5, Ctrl+R | refresh the list |
+| Ctrl+, | preferences |
+| Ctrl+? | all shortcuts |
 
-## Как устроено
+## How it works
 
-| Часть | Что делает |
+| Part | What it does |
 |---|---|
-| `crates/core` | Без GUI: источники (`sources/`), классификация (`classify.rs`), склейка в приложения (`merge.rs`), защита (`protect.rs`), план удаления через libalpm (`plan.rs`), остатки (`leftovers.rs`) |
-| `crates/app` | Интерфейс на GTK4 + libadwaita (Relm4) |
-| `crates/helper` | `appreestr-helper` — единственная часть, работающая от root (через pkexec). Заново проверяет имена, план и защиту; удаляет штатными средствами |
-| `crates/dump` | Служебная утилита: `appreestr-dump --all` показывает, что и почему попало в список; `--plan PKG`, `--leftovers APP-ID`, `--timings` |
-| `data/rules/*.toml` | Правила классификации, репозиториев и защиты — правятся без перекомпиляции; свои дополнения можно класть в `~/.config/appreestr/rules.toml` |
+| `crates/core` | No GUI: sources (`sources/`), classification (`classify.rs`), merging into apps (`merge.rs`), protection (`protect.rs`), removal plan through libalpm (`plan.rs`), leftovers (`leftovers.rs`) |
+| `crates/app` | GTK4 + libadwaita interface (Relm4) |
+| `crates/helper` | `appreestr-helper`, the only part that runs as root (through pkexec). It re-checks names, plan and protection, and removes with the standard tools |
+| `crates/dump` | Developer tool: `appreestr-dump --all` shows what is listed and why; `--plan PKG`, `--leftovers APP-ID`, `--timings` |
+| `data/rules/*.toml` | Classification, repository and protection rules, editable without recompiling; put your own additions in `~/.config/appreestr/rules.toml` |
 
-Настройки и ручная разметка хранятся в `~/.config/appreestr/`, кэш — в `~/.cache/appreestr/`.
+Settings and manual marks live in `~/.config/appreestr/`, the cache in `~/.cache/appreestr/`.
 
-## Проверка
+## Development
 
 ```bash
-make check          # rustfmt, clippy, тесты, проверка .desktop и metainfo
+make check          # rustfmt, clippy, tests, .desktop and metainfo validation
 cargo run -p appreestr-dump -- --timings --all
 ```
 
-Проверка удаления от начала до конца на безвредных пакетах — в `tests/pkg/PKGBUILD`.
+An end-to-end removal test on harmless packages is in `tests/pkg/PKGBUILD`. See
+[CONTRIBUTING.md](CONTRIBUTING.md) before sending a pull request, and [SECURITY.md](SECURITY.md)
+to report a vulnerability.
 
-## Лицензия
+## License
 
-GPL-3.0-or-later.
+GPL-3.0-or-later. See [LICENSE](LICENSE).

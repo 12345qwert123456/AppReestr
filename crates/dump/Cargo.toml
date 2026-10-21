@@ -3,6 +3,7 @@ name = "appreestr-dump"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Developer tool: prints what AppReestr would list and why"
 
 [dependencies]

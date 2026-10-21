@@ -5,3 +5,8 @@
 /packaging/src/
 /packaging/pkg/
 /packaging/*.pkg.tar.*
+*.mo
+*~
+.claude/settings.local.json
+.idea/
+.vscode/
