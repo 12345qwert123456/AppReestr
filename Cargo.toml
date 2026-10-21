@@ -28,7 +28,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 backhand = { version = "0.25", default-features = false, features = ["xz", "gzip", "zstd"] }
 relm4 = { version = "0.11", features = ["libadwaita", "gnome_48"] }
 gettext-rs = { version = "0.8", features = ["gettext-system"] }
-nix = { version = "0.30", features = ["term", "process", "signal", "fs", "ioctl", "user"] }
+nix = { version = "0.31", features = ["term", "process", "signal", "fs", "ioctl", "user"] }
 notify = "8"
 insta = "1"
 
