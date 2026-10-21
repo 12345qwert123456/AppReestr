@@ -18,5 +18,6 @@ pub mod rules;
 pub mod scan;
 pub mod sources;
 pub mod sysroot;
+pub mod update;
 
 pub const APP_ID: &str = "io.github.appreestr.AppReestr";

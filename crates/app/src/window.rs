@@ -97,6 +97,7 @@ pub enum Msg {
     SetTheme(appreestr_core::config::Theme),
     SetTransparency(u8),
     SetLanguage(String),
+    SetCheckUpdates(bool),
     SetAppImageDirs(Vec<String>),
     FocusSearch,
     ClearSearch,
@@ -116,6 +117,7 @@ pub enum Cmd {
     Elevate(crate::removal::Event),
     DangerListing(Box<crate::danger::Listing>),
     ForcePlanned(Box<crate::danger::Planned>),
+    Update(Option<appreestr_core::update::Release>),
 }
 
 // Kept short: relm4 logs command outputs, and a full scan result is megabytes of text.
@@ -131,6 +133,7 @@ impl std::fmt::Debug for Cmd {
             Cmd::Elevate(e) => write!(f, "Elevate({e:?})"),
             Cmd::DangerListing(l) => write!(f, "DangerListing({} packages)", l.packages.len()),
             Cmd::ForcePlanned(p) => write!(f, "ForcePlanned({})", p.name),
+            Cmd::Update(r) => write!(f, "Update({:?})", r.as_ref().map(|r| &r.version)),
         }
     }
 }
@@ -190,6 +193,17 @@ impl AppModel {
                 tracing::warn!("saving snapshot: {e}");
             }
             Cmd::Scanned(Box::new(res))
+        });
+    }
+
+    /// Asks for a newer release if the user allowed it and a day has passed. Reports through a toast.
+    fn check_updates(&self, sender: &ComponentSender<Self>) {
+        if !self.settings.check_updates || crate::elevate::is_root() {
+            return;
+        }
+        let cache_home = self.sys.cache_home.clone();
+        sender.spawn_oneshot_command(move || {
+            Cmd::Update(appreestr_core::update::check(&cache_home, env!("CARGO_PKG_VERSION")))
         });
     }
 
@@ -773,6 +787,7 @@ impl Component for AppModel {
         };
         model.refresh_list(&widgets);
         model.start_scan(&sender, &widgets);
+        model.check_updates(&sender);
         ComponentParts { model, widgets }
     }
 
@@ -1001,6 +1016,11 @@ impl Component for AppModel {
                 // Names and summaries in the snapshot are in the old language.
                 let _ = std::fs::remove_file(cache::snapshot_path(&self.sys.cache_home));
             }
+            Msg::SetCheckUpdates(on) => {
+                self.settings.check_updates = on;
+                self.save_settings();
+                self.check_updates(&sender);
+            }
             Msg::SetAppImageDirs(dirs) => {
                 self.settings.appimage_dirs = dirs;
                 self.save_settings();
@@ -1107,6 +1127,19 @@ impl Component for AppModel {
             },
             Cmd::DangerListing(l) => crate::danger::picker(*l, root, &sender),
             Cmd::ForcePlanned(p) => crate::danger::confirm(*p, root, &sender),
+            Cmd::Update(Some(release)) => {
+                let toast = adw::Toast::builder()
+                    .title(trf("Version {} is available. Update it with your package manager.", &[&release.version]))
+                    .button_label(tr("Release Notes"))
+                    .timeout(0)
+                    .build();
+                let root = root.clone();
+                toast.connect_button_clicked(move |_| {
+                    gtk::UriLauncher::new(&release.url).launch(Some(&root), None::<&gio::Cancellable>, |_| {});
+                });
+                w.toasts.add_toast(toast);
+            }
+            Cmd::Update(None) => {}
         }
     }
 }

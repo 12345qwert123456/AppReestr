@@ -76,7 +76,7 @@ msgstr ""
 msgid "Dependencies and protection are ignored. The system may stop working."
 msgstr ""
 
-#: crates/app/src/danger.rs:275 crates/app/src/uninstall.rs:180 crates/app/src/uninstall.rs:467 crates/app/src/uninstall.rs:671 crates/app/src/uninstall.rs:761 crates/app/src/window.rs:910
+#: crates/app/src/danger.rs:275 crates/app/src/uninstall.rs:180 crates/app/src/uninstall.rs:467 crates/app/src/uninstall.rs:671 crates/app/src/uninstall.rs:761 crates/app/src/window.rs:925
 msgid "Cancel"
 msgstr ""
 
@@ -124,11 +124,11 @@ msgstr ""
 msgid "from a package file"
 msgstr ""
 
-#: crates/app/src/details.rs:44 crates/app/src/details.rs:144 crates/app/src/row.rs:176 crates/app/src/window.rs:699
+#: crates/app/src/details.rs:44 crates/app/src/details.rs:144 crates/app/src/row.rs:176 crates/app/src/window.rs:713
 msgid "Uninstall…"
 msgstr ""
 
-#: crates/app/src/details.rs:53 crates/app/src/window.rs:493
+#: crates/app/src/details.rs:53 crates/app/src/window.rs:507
 msgid "Source"
 msgstr ""
 
@@ -136,7 +136,7 @@ msgstr ""
 msgid "Version"
 msgstr ""
 
-#: crates/app/src/details.rs:58 crates/app/src/window.rs:493
+#: crates/app/src/details.rs:58 crates/app/src/window.rs:507
 msgid "Size"
 msgstr ""
 
@@ -248,11 +248,11 @@ msgstr ""
 msgid "Show as Application"
 msgstr ""
 
-#: crates/app/src/details.rs:234 crates/app/src/prefs.rs:138
+#: crates/app/src/details.rs:234 crates/app/src/prefs.rs:149
 msgid "Danger Zone"
 msgstr ""
 
-#: crates/app/src/details.rs:235 crates/app/src/prefs.rs:139
+#: crates/app/src/details.rs:235 crates/app/src/prefs.rs:150
 msgid "For when an ordinary uninstall is refused."
 msgstr ""
 
@@ -260,7 +260,7 @@ msgstr ""
 msgid "Force Remove “{}”…"
 msgstr ""
 
-#: crates/app/src/details.rs:240 crates/app/src/prefs.rs:143
+#: crates/app/src/details.rs:240 crates/app/src/prefs.rs:154
 msgid "Ignores dependencies and protection. The system may stop working."
 msgstr ""
 
@@ -324,7 +324,7 @@ msgstr ""
 msgid "Keyboard shortcuts"
 msgstr ""
 
-#: crates/app/src/dialogs.rs:46 crates/app/src/window.rs:483
+#: crates/app/src/dialogs.rs:46 crates/app/src/window.rs:497
 msgid "Preferences"
 msgstr ""
 
@@ -364,31 +364,39 @@ msgstr ""
 msgid "Restart to apply the language."
 msgstr ""
 
-#: crates/app/src/prefs.rs:69 crates/app/src/window.rs:911
+#: crates/app/src/prefs.rs:69 crates/app/src/window.rs:926
 msgid "Restart"
 msgstr ""
 
 #: crates/app/src/prefs.rs:82
-msgid "AppImage Folders"
+msgid "Check for Updates"
 msgstr ""
 
 #: crates/app/src/prefs.rs:83
+msgid "Once a day, asks github.com for the latest version. Nothing is installed automatically."
+msgstr ""
+
+#: crates/app/src/prefs.rs:93
+msgid "AppImage Folders"
+msgstr ""
+
+#: crates/app/src/prefs.rs:94
 msgid "AppImage files are looked for in these folders. Files started from the menu are found anywhere."
 msgstr ""
 
-#: crates/app/src/prefs.rs:90
+#: crates/app/src/prefs.rs:101
 msgid "Add Folder…"
 msgstr ""
 
-#: crates/app/src/prefs.rs:103
+#: crates/app/src/prefs.rs:114
 msgid "Stop looking here"
 msgstr ""
 
-#: crates/app/src/prefs.rs:119
+#: crates/app/src/prefs.rs:130
 msgid "Choose a Folder"
 msgstr ""
 
-#: crates/app/src/prefs.rs:142
+#: crates/app/src/prefs.rs:153
 msgid "Force Remove a Package…"
 msgstr ""
 
@@ -656,7 +664,7 @@ msgstr ""
 msgid "Removed together with it, because nothing else needs them."
 msgstr ""
 
-#: crates/app/src/uninstall.rs:43 crates/app/src/window.rs:251
+#: crates/app/src/uninstall.rs:43 crates/app/src/window.rs:265
 msgid "{} application"
 msgid_plural "{} applications"
 msgstr[0] ""
@@ -698,159 +706,167 @@ msgid_plural "{} components"
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/app/src/window.rs:208
+#: crates/app/src/window.rs:222
 msgid "All"
 msgstr ""
 
-#: crates/app/src/window.rs:239
+#: crates/app/src/window.rs:253
 msgid "Select applications to uninstall"
 msgstr ""
 
-#: crates/app/src/window.rs:246
+#: crates/app/src/window.rs:260
 msgid "Select None"
 msgstr ""
 
-#: crates/app/src/window.rs:246 crates/app/src/window.rs:695
+#: crates/app/src/window.rs:260 crates/app/src/window.rs:709
 msgid "Select All"
 msgstr ""
 
-#: crates/app/src/window.rs:272
+#: crates/app/src/window.rs:286
 msgid "No Results for “{}”"
 msgstr ""
 
-#: crates/app/src/window.rs:273
+#: crates/app/src/window.rs:287
 msgid "Check the spelling or try a different search."
 msgstr ""
 
-#: crates/app/src/window.rs:274
+#: crates/app/src/window.rs:288
 msgid "Clear Search"
 msgstr ""
 
-#: crates/app/src/window.rs:278 crates/app/src/window.rs:284 crates/app/src/window.rs:290 crates/app/src/window.rs:295 crates/app/src/window.rs:671
+#: crates/app/src/window.rs:292 crates/app/src/window.rs:298 crates/app/src/window.rs:304 crates/app/src/window.rs:309 crates/app/src/window.rs:685
 msgid "Nothing Found"
 msgstr ""
 
-#: crates/app/src/window.rs:279
+#: crates/app/src/window.rs:293
 msgid "Only applications are shown. System components are hidden."
 msgstr ""
 
-#: crates/app/src/window.rs:280 crates/app/src/window.rs:477
+#: crates/app/src/window.rs:294 crates/app/src/window.rs:491
 msgid "Show System Components"
 msgstr ""
 
-#: crates/app/src/window.rs:285
+#: crates/app/src/window.rs:299
 msgid "Only applications are shown. Command-line tools are hidden."
 msgstr ""
 
-#: crates/app/src/window.rs:286 crates/app/src/window.rs:478
+#: crates/app/src/window.rs:300 crates/app/src/window.rs:492
 msgid "Show Command-Line Tools"
 msgstr ""
 
-#: crates/app/src/window.rs:291
+#: crates/app/src/window.rs:305
 msgid "Only applications are shown. Add-ons are hidden."
 msgstr ""
 
-#: crates/app/src/window.rs:292 crates/app/src/window.rs:479
+#: crates/app/src/window.rs:306 crates/app/src/window.rs:493
 msgid "Show Add-ons"
 msgstr ""
 
-#: crates/app/src/window.rs:295
+#: crates/app/src/window.rs:309
 msgid "No installed applications were found."
 msgstr ""
 
-#: crates/app/src/window.rs:482
+#: crates/app/src/window.rs:496
 msgid "Refresh"
 msgstr ""
 
-#: crates/app/src/window.rs:484
+#: crates/app/src/window.rs:498
 msgid "Keyboard Shortcuts"
 msgstr ""
 
-#: crates/app/src/window.rs:485
+#: crates/app/src/window.rs:499
 msgid "About AppReestr"
 msgstr ""
 
-#: crates/app/src/window.rs:493
+#: crates/app/src/window.rs:507
 msgid "Name"
 msgstr ""
 
-#: crates/app/src/window.rs:493
+#: crates/app/src/window.rs:507
 msgid "Installation Date"
 msgstr ""
 
-#: crates/app/src/window.rs:556
+#: crates/app/src/window.rs:570
 msgid "Installed applications"
 msgstr ""
 
-#: crates/app/src/window.rs:571
+#: crates/app/src/window.rs:585
 msgid "Search applications"
 msgstr ""
 
-#: crates/app/src/window.rs:588
+#: crates/app/src/window.rs:602
 msgid "Updating the list…"
 msgstr ""
 
-#: crates/app/src/window.rs:591 crates/app/src/window.rs:593
+#: crates/app/src/window.rs:605 crates/app/src/window.rs:607
 msgid "Select Applications"
 msgstr ""
 
-#: crates/app/src/window.rs:599
+#: crates/app/src/window.rs:613
 msgid "Restart as Administrator…"
 msgstr ""
 
-#: crates/app/src/window.rs:609
+#: crates/app/src/window.rs:623
 msgid "Main Menu"
 msgstr ""
 
-#: crates/app/src/window.rs:615
+#: crates/app/src/window.rs:629
 msgid "Sort"
 msgstr ""
 
-#: crates/app/src/window.rs:664
+#: crates/app/src/window.rs:678
 msgid "Looking for installed applications…"
 msgstr ""
 
-#: crates/app/src/window.rs:688
+#: crates/app/src/window.rs:702
 msgid "Administrator mode: removing does not ask for a password."
 msgstr ""
 
-#: crates/app/src/window.rs:709
+#: crates/app/src/window.rs:723
 msgid "Installed Applications"
 msgstr ""
 
-#: crates/app/src/window.rs:905
+#: crates/app/src/window.rs:920
 msgid "Restart as Administrator?"
 msgstr ""
 
-#: crates/app/src/window.rs:906
+#: crates/app/src/window.rs:921
 msgid "AppReestr reopens with full system access. The password is asked once; removals then do not ask for it."
 msgstr ""
 
-#: crates/app/src/window.rs:943
+#: crates/app/src/window.rs:958
 msgid "Unused Flatpak runtimes"
 msgstr ""
 
-#: crates/app/src/window.rs:967
+#: crates/app/src/window.rs:982
 msgid "“{}” is hidden. It stays under system components."
 msgstr ""
 
-#: crates/app/src/window.rs:968
+#: crates/app/src/window.rs:983
 msgid "“{}” is now shown as an application"
 msgstr ""
 
-#: crates/app/src/window.rs:969
+#: crates/app/src/window.rs:984
 msgid "“{}” is classified automatically again"
 msgstr ""
 
-#: crates/app/src/window.rs:971
+#: crates/app/src/window.rs:986
 msgid "Undo"
 msgstr ""
 
-#: crates/app/src/window.rs:1076
+#: crates/app/src/window.rs:1096
 msgid "Some sources could not be read: {}"
 msgstr ""
 
-#: crates/app/src/window.rs:241
+#: crates/app/src/window.rs:1132
+msgid "Version {} is available. Update it with your package manager."
+msgstr ""
+
+#: crates/app/src/window.rs:1133
+msgid "Release Notes"
+msgstr ""
+
+#: crates/app/src/window.rs:255
 msgid "{} selected"
 msgid_plural "{} selected"
 msgstr[0] ""

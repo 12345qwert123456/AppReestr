@@ -38,6 +38,8 @@ pub struct Settings {
     pub transparency: u8,
     /// Interface language code (`en`, `ru`, …); English unless the user picks another.
     pub language: String,
+    /// Look for a newer release once a day (one request to GitHub). Off until the user asks.
+    pub check_updates: bool,
     /// Directories searched for AppImages (relative paths are relative to $HOME).
     pub appimage_dirs: Vec<String>,
 }
@@ -53,6 +55,7 @@ impl Default for Settings {
             theme: Theme::System,
             transparency: 0,
             language: "en".into(),
+            check_updates: false,
             appimage_dirs: ["Applications", "AppImages", "Apps", ".local/bin", "Downloads", "Desktop", "bin", "opt"]
                 .iter()
                 .map(|s| s.to_string())

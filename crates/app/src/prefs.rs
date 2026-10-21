@@ -78,6 +78,17 @@ pub fn show(settings: &Settings, root: &adw::ApplicationWindow, sender: &Compone
     lang_group.add(&language);
     page.add(&lang_group);
 
+    let updates = adw::SwitchRow::builder()
+        .title(tr("Check for Updates"))
+        .subtitle(tr("Once a day, asks github.com for the latest version. Nothing is installed automatically."))
+        .active(settings.check_updates)
+        .build();
+    let s = sender.clone();
+    updates.connect_active_notify(move |r| s.input(Msg::SetCheckUpdates(r.is_active())));
+    let updates_group = adw::PreferencesGroup::new();
+    updates_group.add(&updates);
+    page.add(&updates_group);
+
     let folders = adw::PreferencesGroup::builder()
         .title(tr("AppImage Folders"))
         .description(tr(

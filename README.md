@@ -40,11 +40,32 @@ each one came from, and a safe way to remove it.
   preview.
 - **Manual marks**: "hide from the list" and "show as an application" are remembered.
 - **Unneeded components** after removal: AppReestr offers to clean up what nothing needs any more.
-- **No network, no telemetry.** Browsing needs no administrator rights.
+- **No telemetry, no network by default.** Browsing needs no administrator rights. The optional update
+  check (Preferences, off by default) makes one request a day to github.com; it only tells you about a new
+  version.
 - Fully keyboard-driven, follows the system light/dark theme, available in English (default) and Russian. The
   language is chosen in Preferences and applies after a restart.
 
-## Build and install
+## Install
+
+From the AUR (releases, or `appreestr-git` for the main branch):
+
+```bash
+yay -S appreestr        # or paru -S appreestr
+```
+
+Every release also has a ready package, `appreestr-X.Y.Z-1-x86_64.pkg.tar.zst`, on the
+[Releases](https://github.com/12345qwert123456/AppReestr/releases) page (`sudo pacman -U <file>`). It is
+linked against the libalpm of the Arch it was built on, so prefer the AUR package on other systems.
+
+### Updates
+
+The program is updated by your package manager (`yay -Syu`, `paru`), like any other package; it never
+installs anything by itself. Turn on "Check for Updates" in Preferences to be told when a new release
+appears. AppReestr targets Arch and derivatives (it is built on libalpm), so there are no packages for
+Debian and other distributions.
+
+### Build from source
 
 Dependencies: `rust`, `gtk4`, `libadwaita`, `pacman` (libalpm), `polkit`, `gettext`.
 
@@ -55,7 +76,7 @@ make
 sudo make install
 ```
 
-Or as a package:
+Or as a package built from the working tree:
 
 ```bash
 cd packaging && makepkg -si
