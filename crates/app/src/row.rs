@@ -1,7 +1,8 @@
 //! One row of the application list.
 
+use crate::ui::{self, ICON_ROW, SPACE_S, SPACE_XS};
 use crate::{format, icons};
-use appreestr_core::i18n::tr;
+use appreestr_core::i18n::{tr, trf};
 use appreestr_core::model::{App, Visibility};
 use appreestr_core::reasons::{format_size, source_short};
 use relm4::gtk::{self, gio, glib, prelude::*};
@@ -19,14 +20,6 @@ pub struct RowWidgets {
     size: gtk::Label,
     date: gtk::Label,
     menu: gtk::MenuButton,
-}
-
-fn label(classes: &[&str]) -> gtk::Label {
-    let l = gtk::Label::builder().xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).build();
-    for c in classes {
-        l.add_css_class(c);
-    }
-    l
 }
 
 /// Row menu: actions on the window, targeted at the app id.
@@ -59,29 +52,23 @@ impl RelmListItem for AppRow {
     type Widgets = RowWidgets;
 
     fn setup(_item: &gtk::ListItem) -> (gtk::Box, RowWidgets) {
-        let root = gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
-            .spacing(12)
-            .margin_top(8)
-            .margin_bottom(8)
-            .margin_start(6)
-            .margin_end(6)
-            .build();
-        let icon = gtk::Image::builder().pixel_size(32).build();
+        let root = ui::hbox(SPACE_S);
+        root.set_margin_top(SPACE_XS);
+        root.set_margin_bottom(SPACE_XS);
+        let icon = gtk::Image::builder().pixel_size(ICON_ROW).build();
         icon.add_css_class("icon-dropshadow");
-        let text = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .hexpand(true)
-            .valign(gtk::Align::Center)
-            .build();
-        let title = label(&["heading"]);
-        let subtitle = label(&["dim-label", "caption"]);
+        let text = ui::vbox(0);
+        text.set_hexpand(true);
+        text.set_valign(gtk::Align::Center);
+        let title = ui::label("", &["heading"]);
+        let subtitle = ui::label("", &["dimmed", "caption"]);
         text.append(&title);
         text.append(&subtitle);
-        let meta = gtk::Box::builder().orientation(gtk::Orientation::Vertical).valign(gtk::Align::Center).build();
-        let size = label(&["numeric"]);
+        let meta = ui::vbox(0);
+        meta.set_valign(gtk::Align::Center);
+        let size = ui::label("", &["numeric"]);
         size.set_xalign(1.0);
-        let date = label(&["dim-label", "caption", "numeric"]);
+        let date = ui::label("", &["dimmed", "caption", "numeric"]);
         date.set_xalign(1.0);
         meta.append(&size);
         meta.append(&date);
@@ -91,6 +78,7 @@ impl RelmListItem for AppRow {
             .tooltip_text(tr("Actions"))
             .build();
         menu.add_css_class("flat");
+        menu.update_property(&[gtk::accessible::Property::Label(&tr("Actions"))]);
         root.append(&icon);
         root.append(&text);
         root.append(&meta);
@@ -113,5 +101,6 @@ impl RelmListItem for AppRow {
         w.size.set_label(&app.total_size().map(format_size).unwrap_or_default());
         w.date.set_label(&app.installed_at().map(format::date).unwrap_or_default());
         w.menu.set_menu_model(Some(&row_menu(app)));
+        w.menu.update_property(&[gtk::accessible::Property::Label(&trf("Actions for “{}”", &[&app.name]))]);
     }
 }

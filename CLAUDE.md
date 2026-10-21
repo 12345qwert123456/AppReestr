@@ -76,6 +76,15 @@ The scan takes about 0.4 s in release. The UI shows `cache.rs`'s snapshot (postc
 - `crates/app/build.rs` compiles `.po` into `OUT_DIR` for runs from the tree.
 - `format_size` uses the locale's decimal separator.
 
+## UI conventions
+
+- Build screens from `crates/app/src/ui.rs`: spacing constants (6 px grid: `SPACE_XS/S/M/L/XL`), `LIST_WIDTH`, and factories (`boxed_list`, `property_row`, `row_with_size`, `warning_row`, `icon_button`, `pill`). Do not hard-code margins or add per-file row helpers.
+- Styles are libadwaita classes only (`dimmed`, `caption`, `heading`, `title-*`, `numeric`, `property`); never the deprecated `dim-label` and never hard-coded colours. `style.css` stays minimal.
+- One main action per screen, as a `pill` (`Destructive` for removal, `Suggested` for "continue"). Secondary actions are `flat` buttons; row actions activate the whole row with a dimmed hint icon (`row_hint`). Icon-only buttons must have a tooltip (`icon_button` also sets the accessible label).
+- An ellipsis only on controls that open a dialog ("Uninstall…", "Add Folder…"), never on a dialog's final button.
+- Text: English msgids in header case for buttons, menu items and titles, sentence case for descriptions; Russian in sentence case with «» quotes.
+- Dialogs keep the body to one short sentence; warnings and options are rows in a `boxed_list`.
+
 ## Checking the UI without a screen
 
 Viewing the app in a browser through `gtk4-broadwayd` crashes broadwayd once the list re-renders. Debug builds instead have a screenshot mode (`crates/app/src/devtools.rs`). With a headless `gtk4-broadwayd :7` running:

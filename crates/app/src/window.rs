@@ -2,6 +2,7 @@
 
 use crate::details::{self, DetailsPage};
 use crate::row::AppRow;
+use crate::ui::{self, LIST_WIDTH, SPACE_S, SPACE_XS};
 use appreestr_core::cache;
 use appreestr_core::config::{ConfigStore, Overrides, Settings, SortKey};
 use appreestr_core::i18n::{tr, trf, trn};
@@ -76,8 +77,10 @@ pub enum Msg {
     ExternalChange,
     Preferences,
     SetTheme(appreestr_core::config::Theme),
+    SetTransparency(u8),
     SetAppImageDirs(Vec<String>),
     FocusSearch,
+    ClearSearch,
     FocusList,
     Back,
     About,
@@ -112,6 +115,8 @@ pub struct Widgets {
     stack: gtk::Stack,
     chips: Vec<(Option<SourceFilter>, gtk::ToggleButton)>,
     summary: gtk::Label,
+    empty: adw::StatusPage,
+    empty_button: gtk::Button,
     nav: adw::NavigationView,
     pub toasts: adw::ToastOverlay,
     list_view: gtk::ListView,
@@ -188,7 +193,42 @@ impl AppModel {
         } else {
             "list"
         };
+        if page == "empty" {
+            self.update_empty(w);
+        }
         w.stack.set_visible_child_name(page);
+    }
+
+    /// The "nothing to show" page explains why and offers the way out.
+    fn update_empty(&self, w: &Widgets) {
+        let (title, description, button) = if !self.query.text.is_empty() {
+            (
+                trf("No Results for “{}”", &[&self.query.text]),
+                tr("Check the spelling or try a different search."),
+                Some((tr("Clear Search"), "win.clear-search")),
+            )
+        } else if !self.query.show_system {
+            (
+                tr("Nothing Found"),
+                tr("Only applications are shown. System components are hidden."),
+                Some((tr("Show System Components"), "win.show-system")),
+            )
+        } else if !self.query.show_console {
+            (
+                tr("Nothing Found"),
+                tr("Only applications are shown. Command-line tools are hidden."),
+                Some((tr("Show Command-Line Tools"), "win.show-console")),
+            )
+        } else {
+            (tr("Nothing Found"), tr("No installed applications were found."), None)
+        };
+        w.empty.set_title(&title);
+        w.empty.set_description(Some(&description));
+        w.empty_button.set_visible(button.is_some());
+        if let Some((label, action)) = button {
+            w.empty_button.set_label(&label);
+            w.empty_button.set_action_name(Some(action));
+        }
     }
 
     fn sync_actions(&self, w: &Widgets) {
@@ -320,6 +360,7 @@ fn build_actions(sender: &ComponentSender<AppModel>, q: &ListQuery) -> gio::Simp
     };
     plain("refresh", || Msg::Refresh);
     plain("search", || Msg::FocusSearch);
+    plain("clear-search", || Msg::ClearSearch);
     plain("about", || Msg::About);
     plain("preferences", || Msg::Preferences);
     plain("shortcuts", || Msg::Shortcuts);
@@ -412,7 +453,7 @@ impl Component for AppModel {
             sort: settings.sort,
             ..Default::default()
         };
-        crate::theme::apply(settings.theme);
+        crate::theme::apply(&settings);
 
         // Instant start: show the last snapshot while the fresh scan runs.
         let apps: Vec<Arc<App>> =
@@ -422,6 +463,8 @@ impl Component for AppModel {
         let list_view = list.view.clone();
         list_view.set_single_click_activate(true);
         list_view.add_css_class("navigation-sidebar");
+        list_view.set_margin_top(SPACE_XS);
+        list_view.set_margin_bottom(SPACE_S);
         list_view.update_property(&[gtk::accessible::Property::Label(&tr("Installed applications"))]);
         let s = sender.clone();
         list_view.connect_activate(move |_, pos| s.input(Msg::Activate(pos)));
@@ -453,9 +496,7 @@ impl Component for AppModel {
             glib::Propagation::Proceed
         });
         search.add_controller(skey);
-        let search_clamp = adw::Clamp::builder().maximum_size(480).child(&search).build();
-
-        let header = adw::HeaderBar::builder().title_widget(&search_clamp).build();
+        let header = adw::HeaderBar::builder().title_widget(&adw::WindowTitle::new("AppReestr", "")).build();
         let refresh_spinner = adw::Spinner::builder().visible(false).tooltip_text(tr("Updating the list…")).build();
         header.pack_start(&refresh_spinner);
         let menu_button = gtk::MenuButton::builder()
@@ -473,7 +514,7 @@ impl Component for AppModel {
         header.pack_end(&sort_button);
 
         // Source filter chips.
-        let chips_box = gtk::Box::builder().spacing(6).margin_start(12).margin_end(12).margin_bottom(6).build();
+        let chips_box = ui::hbox(SPACE_XS);
         let mut chips = Vec::new();
         let mut first: Option<gtk::ToggleButton> = None;
         for f in FILTERS {
@@ -499,12 +540,19 @@ impl Component for AppModel {
             .hscrollbar_policy(gtk::PolicyType::External)
             .child(&chips_box)
             .build();
-        let summary = gtk::Label::builder().xalign(0.0).margin_start(18).margin_bottom(6).build();
-        summary.add_css_class("dim-label");
-        summary.add_css_class("caption");
-        let subheader = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
-        subheader.append(&chips_scroll);
-        subheader.append(&summary);
+        let summary = ui::label("", &["dimmed", "caption"]);
+        summary.set_margin_start(SPACE_S);
+        summary.set_margin_bottom(SPACE_XS);
+        // Search, filters and the summary share the list's clamp and the same inset from its edges.
+        let filters = ui::vbox(SPACE_S);
+        filters.set_margin_start(SPACE_XS);
+        filters.set_margin_end(SPACE_XS);
+        filters.set_margin_top(SPACE_S);
+        filters.append(&search);
+        filters.append(&chips_scroll);
+        filters.append(&summary);
+        // The same clamp as the list below, so the left edges line up.
+        let subheader = adw::Clamp::builder().maximum_size(LIST_WIDTH).child(&filters).build();
 
         // Content: loading / empty / list.
         let stack = gtk::Stack::builder().transition_type(gtk::StackTransitionType::Crossfade).build();
@@ -513,15 +561,14 @@ impl Component for AppModel {
             .paintable(&adw::SpinnerPaintable::new(None::<&gtk::Widget>))
             .build();
         stack.add_named(&loading, Some("loading"));
+        let empty_button = ui::pill("", ui::Kind::Suggested);
         let empty = adw::StatusPage::builder()
             .icon_name("edit-find-symbolic")
             .title(tr("Nothing Found"))
-            .description(tr(
-                "Try a different search, or show system components and command-line tools from the main menu.",
-            ))
+            .child(&empty_button)
             .build();
         stack.add_named(&empty, Some("empty"));
-        let clamp = adw::ClampScrollable::builder().maximum_size(900).child(&list_view).build();
+        let clamp = adw::ClampScrollable::builder().maximum_size(LIST_WIDTH).child(&list_view).build();
         let scrolled = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .vexpand(true)
@@ -530,6 +577,8 @@ impl Component for AppModel {
         stack.add_named(&scrolled, Some("list"));
 
         let toolbar = adw::ToolbarView::new();
+        toolbar.add_css_class("translucent");
+        root.add_css_class("translucent");
         toolbar.add_top_bar(&header);
         toolbar.add_top_bar(&subheader);
         toolbar.set_content(Some(&stack));
@@ -577,7 +626,19 @@ impl Component for AppModel {
             _watcher: None,
         };
         model._watcher = crate::watcher::watch(&model.sys, &model.settings.appimage_dirs, sender.clone());
-        let widgets = Widgets { search, stack, chips, summary, nav, toasts, list_view, actions, refresh_spinner };
+        let widgets = Widgets {
+            search,
+            stack,
+            chips,
+            summary,
+            empty,
+            empty_button,
+            nav,
+            toasts,
+            list_view,
+            actions,
+            refresh_spinner,
+        };
         model.refresh_list(&widgets);
         model.start_scan(&sender, &widgets);
         ComponentParts { model, widgets }
@@ -709,7 +770,12 @@ impl Component for AppModel {
             Msg::Preferences => crate::prefs::show(&self.settings, root, &sender),
             Msg::SetTheme(t) => {
                 self.settings.theme = t;
-                crate::theme::apply(t);
+                crate::theme::apply(&self.settings);
+                self.save_settings();
+            }
+            Msg::SetTransparency(v) => {
+                self.settings.transparency = v;
+                crate::theme::apply(&self.settings);
                 self.save_settings();
             }
             Msg::SetAppImageDirs(dirs) => {
@@ -726,6 +792,7 @@ impl Component for AppModel {
             Msg::FocusSearch => {
                 w.search.grab_focus();
             }
+            Msg::ClearSearch => w.search.set_text(""),
             Msg::FocusList => {
                 if !self.visible.is_empty() {
                     w.list_view.scroll_to(0, gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT, None);

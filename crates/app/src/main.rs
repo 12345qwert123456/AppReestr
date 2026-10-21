@@ -10,6 +10,7 @@ mod prefs;
 mod removal;
 mod row;
 mod theme;
+mod ui;
 mod uninstall;
 mod watcher;
 mod window;

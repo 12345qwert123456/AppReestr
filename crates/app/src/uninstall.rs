@@ -2,6 +2,7 @@
 
 use crate::format;
 use crate::removal::{self, Event, Job, Step};
+use crate::ui::{self, DIALOG_WIDTH, SPACE_L, SPACE_M, SPACE_S, SPACE_XS};
 use crate::window::{AppModel, Cmd, Msg, ScanData};
 use appreestr_core::i18n::{tr, trf, trn};
 use appreestr_core::leftovers::{self, Confidence, Leftover};
@@ -37,6 +38,7 @@ pub struct Progress {
     log: gtk::TextBuffer,
     expander: gtk::Expander,
     close: gtk::Button,
+    header: adw::HeaderBar,
     pub app_id: String,
     pub app_name: String,
     pub had_pacman: bool,
@@ -108,8 +110,7 @@ fn choose_units(app: &Arc<App>, root: &adw::ApplicationWindow, sender: &Componen
         Some(&trf("Uninstall “{}”", &[&app.name])),
         Some(&tr("It is installed in several ways. Choose what to remove.")),
     );
-    let list = gtk::ListBox::new();
-    list.add_css_class("boxed-list");
+    let list = ui::boxed_list();
     let mut checks = Vec::new();
     for inst in &app.installs {
         let check = gtk::CheckButton::builder().active(!matches!(inst.source, Source::Shortcut { .. })).build();
@@ -193,17 +194,6 @@ fn blocked_reason(plan: &RemovalPlan) -> Option<String> {
     None
 }
 
-fn row_with_size(title: &str, subtitle: &str, size: Option<u64>) -> adw::ActionRow {
-    let r = adw::ActionRow::builder().title(format::escape(title)).subtitle(format::escape(subtitle)).build();
-    if let Some(s) = size {
-        let l = gtk::Label::new(Some(&format_size(s)));
-        l.add_css_class("dim-label");
-        l.add_css_class("numeric");
-        r.add_suffix(&l);
-    }
-    r
-}
-
 /// The confirmation dialog (or an explanation why it cannot be removed).
 pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSender<AppModel>) {
     let name = p.app.name.clone();
@@ -220,37 +210,34 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
 
     let mut steps: Vec<Step> = Vec::new();
     let mut size: u64 = 0;
-    let mut body = Vec::new();
-    let extra = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(12).build();
-    let what = gtk::ListBox::new();
-    what.add_css_class("boxed-list");
-    what.set_selection_mode(gtk::SelectionMode::None);
+    let mut warnings: Vec<String> = Vec::new();
+    let extra = ui::vbox(SPACE_S);
+    let what = ui::boxed_list();
 
     if let Some(Ok(plan)) = &p.pacman {
         size += plan.total_size;
         steps.push(Step::Pacman { pkgs: plan.targets.clone(), fingerprint: plan.fingerprint.clone(), nosave: false });
         let extra_pkgs: Vec<&PlannedPkg> = plan.extra().collect();
-        if !extra_pkgs.is_empty() {
-            body.push(trn(
+        let subtitle = if extra_pkgs.is_empty() {
+            trf("{} · {}", &[&plan.removed.len().to_string(), &format_size(plan.total_size)])
+        } else {
+            trn(
                 "{} component that nothing else needs will be removed too.",
                 "{} components that nothing else needs will be removed too.",
                 extra_pkgs.len() as u64,
-            ));
-        }
-        let exp = adw::ExpanderRow::builder()
-            .title(tr("Packages"))
-            .subtitle(trf("{} · {}", &[&plan.removed.len().to_string(), &format_size(plan.total_size)]))
-            .build();
+            )
+        };
+        let exp = adw::ExpanderRow::builder().title(tr("Packages")).subtitle(format::escape(&subtitle)).build();
         for pkg in &plan.removed {
-            exp.add_row(&row_with_size(&pkg.name, &pkg.version, Some(pkg.size)));
+            exp.add_row(&ui::row_with_size(&pkg.name, &pkg.version, Some(pkg.size)));
         }
         what.append(&exp);
         for (pkg, w) in &plan.warnings {
-            body.push(warning_text(pkg, w));
+            warnings.push(warning_text(pkg, w));
         }
         if !plan.optional_for.is_empty() {
             let users: Vec<String> = plan.optional_for.iter().flat_map(|(_, u)| u.clone()).collect();
-            body.push(warning_text("", &appreestr_core::protect::Warning::OptionalFor(users)));
+            warnings.push(warning_text("", &appreestr_core::protect::Warning::OptionalFor(users)));
         }
     }
     for u in &p.units {
@@ -261,12 +248,12 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
                     FlatpakScope::User => Step::FlatpakUser { flatpak_ref: flatpak_ref.clone() },
                     FlatpakScope::System => Step::FlatpakSystem { flatpak_ref: flatpak_ref.clone() },
                 });
-                what.append(&row_with_size("Flatpak", flatpak_ref, u.size));
+                what.append(&ui::row_with_size("Flatpak", flatpak_ref, u.size));
             }
             Source::Snap { .. } => {
                 size += u.size.unwrap_or(0);
                 steps.push(Step::Snap { name: u.unit_name.clone() });
-                what.append(&row_with_size("Snap", &u.unit_name, u.size));
+                what.append(&ui::row_with_size("Snap", &u.unit_name, u.size));
             }
             Source::AppImage | Source::Manual => {
                 size += u.size.unwrap_or(0);
@@ -277,7 +264,7 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
                     } else {
                         steps.push(Step::RootPath { path: loc.clone() });
                     }
-                    what.append(&row_with_size(&format::path(loc), &source_short(&u.source), None));
+                    what.append(&ui::row_with_size(&format::path(loc), &source_short(&u.source), None));
                 }
                 // Launchers in the user's menu that belong to it.
                 for e in &u.desktop_entries {
@@ -295,19 +282,16 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
             _ => {}
         }
     }
-    extra.append(&what);
 
-    // Leftovers: settings, data and cache in the home folder.
+    // Leftovers: settings, data and cache in the home folder. Off until the user switches it on.
     let left_checks: Rc<RefCell<Vec<(PathBuf, gtk::CheckButton)>>> = Rc::new(RefCell::new(Vec::new()));
-    if !p.leftovers.is_empty() {
+    let left_exp: Option<adw::ExpanderRow> = (!p.leftovers.is_empty()).then(|| {
         let total: u64 = p.leftovers.iter().filter(|l| l.confidence == Confidence::High).filter_map(|l| l.size).sum();
-        let master = gtk::CheckButton::builder()
-            .label(trf("Also remove its settings and data ({})", &[&format_size(total)]))
-            .active(false)
-            .build();
         let exp = adw::ExpanderRow::builder()
             .title(tr("Settings, data and cache"))
-            .subtitle(tr("Moved to the trash, so they can be restored"))
+            .subtitle(format::escape(&trf("{} · moved to the trash, so they can be restored", &[&format_size(total)])))
+            .show_enable_switch(true)
+            .enable_expansion(false)
             .build();
         for l in &p.leftovers {
             let c = gtk::CheckButton::builder().active(l.confidence == Confidence::High).build();
@@ -326,23 +310,20 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
             exp.add_row(&r);
             left_checks.borrow_mut().push((l.path.clone(), c));
         }
-        let lb = gtk::ListBox::new();
-        lb.add_css_class("boxed-list");
-        lb.set_selection_mode(gtk::SelectionMode::None);
-        lb.append(&exp);
-        exp.set_sensitive(false);
-        let e2 = exp.clone();
-        master.connect_toggled(move |m| e2.set_sensitive(m.is_active()));
-        extra.append(&master);
-        extra.append(&lb);
-        left_checks.borrow_mut().insert(0, (PathBuf::new(), master));
-    }
+        what.append(&exp);
+        exp
+    });
 
-    let mut text = trf("This frees {}.", &[&format_size(size)]);
-    for b in &body {
-        text.push_str("\n\n");
-        text.push_str(b);
+    if !warnings.is_empty() {
+        let list = ui::boxed_list();
+        for w in &warnings {
+            list.append(&ui::warning_row(w));
+        }
+        extra.append(&list);
     }
+    extra.append(&what);
+
+    let text = trf("This frees {}.", &[&format_size(size)]);
     let d = adw::AlertDialog::new(Some(&trf("Uninstall “{}”?", &[&name])), Some(&text));
     d.set_extra_child(Some(&extra));
     d.add_response("cancel", &tr("Cancel"));
@@ -366,11 +347,8 @@ pub fn confirm(p: Planned, root: &adw::ApplicationWindow, sender: &ComponentSend
         }
         let mut steps = steps.clone();
         let checks = left_checks.borrow();
-        if let Some((_, master)) = checks.first()
-            && master.is_active()
-        {
-            let paths: Vec<PathBuf> =
-                checks.iter().skip(1).filter(|(_, c)| c.is_active()).map(|(p, _)| p.clone()).collect();
+        if left_exp.as_ref().is_some_and(|e| e.enables_expansion()) {
+            let paths: Vec<PathBuf> = checks.iter().filter(|(_, c)| c.is_active()).map(|(p, _)| p.clone()).collect();
             if !paths.is_empty() {
                 steps.push(Step::Trash { paths });
             }
@@ -411,28 +389,35 @@ pub fn start(m: &mut AppModel, req: JobRequest, root: &adw::ApplicationWindow, s
         .editable(false)
         .monospace(true)
         .wrap_mode(gtk::WrapMode::WordChar)
+        .left_margin(SPACE_XS)
+        .right_margin(SPACE_XS)
+        .top_margin(SPACE_XS)
+        .bottom_margin(SPACE_XS)
         .build();
     let scrolled = gtk::ScrolledWindow::builder().child(&view).min_content_height(160).build();
+    scrolled.add_css_class("card");
     let expander = gtk::Expander::builder().label(tr("Details")).child(&scrolled).build();
-    let close = gtk::Button::builder().label(tr("Close")).halign(gtk::Align::Center).visible(false).build();
-    close.add_css_class("pill");
-    let content = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .spacing(18)
-        .margin_top(24)
-        .margin_bottom(24)
-        .margin_start(24)
-        .margin_end(24)
-        .build();
+    let close = ui::pill(&tr("Close"), ui::Kind::Normal);
+    close.set_visible(false);
+    let content = ui::vbox(SPACE_M);
+    content.set_margin_top(SPACE_L);
+    content.set_margin_bottom(SPACE_L);
+    content.set_margin_start(SPACE_L);
+    content.set_margin_end(SPACE_L);
     content.append(&spinner);
     content.append(&status);
     content.append(&expander);
     content.append(&close);
+    // No way to close it while the job runs; the title buttons come back after a failure.
+    let header = adw::HeaderBar::builder().show_end_title_buttons(false).build();
+    let toolbar = adw::ToolbarView::new();
+    toolbar.add_top_bar(&header);
+    toolbar.set_content(Some(&content));
     let dialog = adw::Dialog::builder()
         .title(trf("Uninstalling “{}”", &[&req.job.title]))
-        .content_width(460)
+        .content_width(DIALOG_WIDTH)
         .can_close(false)
-        .child(&content)
+        .child(&toolbar)
         .build();
     let d2 = dialog.clone();
     close.connect_clicked(move |_| {
@@ -448,6 +433,7 @@ pub fn start(m: &mut AppModel, req: JobRequest, root: &adw::ApplicationWindow, s
         log,
         expander,
         close,
+        header,
         app_id: req.app_id,
         app_name: req.job.title.clone(),
         had_pacman: req.had_pacman,
@@ -493,6 +479,7 @@ pub fn on_event(
             p.status.set_label(&msg);
             p.expander.set_expanded(p.log.char_count() > 0);
             p.close.set_visible(true);
+            p.header.set_show_end_title_buttons(true);
             p.dialog.set_can_close(true);
             sender.input(Msg::Refresh);
         }
@@ -520,8 +507,7 @@ fn follow_up(m: &mut AppModel, p: Progress, sender: &ComponentSender<AppModel>) 
 fn ask_password(root: &adw::ApplicationWindow, message: &str, reply: std::sync::mpsc::Sender<Option<String>>) {
     let d = adw::AlertDialog::new(Some(&tr("Authentication Required")), Some(message));
     let entry = adw::PasswordEntryRow::builder().title(tr("Password")).build();
-    let list = gtk::ListBox::new();
-    list.add_css_class("boxed-list");
+    let list = ui::boxed_list();
     list.append(&entry);
     d.set_extra_child(Some(&list));
     d.add_response("cancel", &tr("Cancel"));
@@ -607,12 +593,10 @@ pub fn confirm_clean(
         Some(&tr("Remove unused components?")),
         Some(&trf("Nothing uses them any more. This frees {}.", &[&format_size(plan.total_size)])),
     );
-    let lb = gtk::ListBox::new();
-    lb.add_css_class("boxed-list");
-    lb.set_selection_mode(gtk::SelectionMode::None);
+    let lb = ui::boxed_list();
     let exp = adw::ExpanderRow::builder().title(tr("Packages")).subtitle(plan.removed.len().to_string()).build();
     for p in &plan.removed {
-        exp.add_row(&row_with_size(&p.name, &p.version, Some(p.size)));
+        exp.add_row(&ui::row_with_size(&p.name, &p.version, Some(p.size)));
     }
     lb.append(&exp);
     d.set_extra_child(Some(&lb));
@@ -690,7 +674,7 @@ pub fn fill_details(m: &AppModel, app_id: &str, plan: Result<RemovalPlan, String
         .subtitle(format_size(size))
         .build();
     for p in extra {
-        exp.add_row(&row_with_size(&p.name, &p.version, Some(p.size)));
+        exp.add_row(&ui::row_with_size(&p.name, &p.version, Some(p.size)));
     }
     d.deps_group.add(&exp);
 }

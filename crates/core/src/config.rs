@@ -15,6 +15,8 @@ pub enum SortKey {
     Source,
 }
 
+pub const MAX_TRANSPARENCY: u8 = 90;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Theme {
     #[default]
@@ -31,6 +33,8 @@ pub struct Settings {
     pub sort: SortKey,
     pub sort_descending: bool,
     pub theme: Theme,
+    /// Window background transparency in percent (0 = opaque, at most `MAX_TRANSPARENCY`).
+    pub transparency: u8,
     /// Directories searched for AppImages (relative paths are relative to $HOME).
     pub appimage_dirs: Vec<String>,
 }
@@ -43,6 +47,7 @@ impl Default for Settings {
             sort: SortKey::Name,
             sort_descending: false,
             theme: Theme::System,
+            transparency: 0,
             appimage_dirs: ["Applications", "AppImages", "Apps", ".local/bin", "Downloads", "Desktop", "bin", "opt"]
                 .iter()
                 .map(|s| s.to_string())
