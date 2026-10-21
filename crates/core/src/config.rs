@@ -36,6 +36,8 @@ pub struct Settings {
     pub theme: Theme,
     /// Window background transparency in percent (0 = opaque, at most `MAX_TRANSPARENCY`).
     pub transparency: u8,
+    /// Interface language code (`en`, `ru`, …); English unless the user picks another.
+    pub language: String,
     /// Directories searched for AppImages (relative paths are relative to $HOME).
     pub appimage_dirs: Vec<String>,
 }
@@ -50,6 +52,7 @@ impl Default for Settings {
             sort_descending: false,
             theme: Theme::System,
             transparency: 0,
+            language: "en".into(),
             appimage_dirs: ["Applications", "AppImages", "Apps", ".local/bin", "Downloads", "Desktop", "bin", "opt"]
                 .iter()
                 .map(|s| s.to_string())

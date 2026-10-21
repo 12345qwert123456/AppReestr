@@ -3,7 +3,7 @@
 use crate::window::{AppModel, Msg};
 use crate::{format, ui};
 use appreestr_core::config::{MAX_TRANSPARENCY, Settings, Theme};
-use appreestr_core::i18n::tr;
+use appreestr_core::i18n::{self, tr};
 use relm4::ComponentSender;
 use relm4::adw::{self, prelude::*};
 use relm4::gtk::{self, gio, glib};
@@ -49,6 +49,34 @@ pub fn show(settings: &Settings, root: &adw::ApplicationWindow, sender: &Compone
     transparency.connect_value_notify(move |r| s.input(Msg::SetTransparency(r.value() as u8)));
     look.add(&transparency);
     page.add(&look);
+
+    let languages = i18n::available(&crate::localedir());
+    let names: Vec<&str> = languages.iter().map(|l| l.name.as_str()).collect();
+    let language = adw::ComboRow::builder().title(tr("Language")).model(&gtk::StringList::new(&names)).build();
+    language.set_selected(languages.iter().position(|l| l.code == settings.language).unwrap_or(0) as u32);
+    let (s, d) = (sender.clone(), dialog.clone());
+    let pending: RefCell<Option<adw::Toast>> = RefCell::new(None);
+    language.connect_selected_notify(move |r| {
+        let Some(chosen) = languages.get(r.selected() as usize) else { return };
+        s.input(Msg::SetLanguage(chosen.code.clone()));
+        if let Some(old) = pending.take() {
+            old.dismiss();
+        }
+        // Going back to the language in use needs no restart.
+        if chosen.code != i18n::active() {
+            let toast = adw::Toast::builder()
+                .title(tr("Restart to apply the language."))
+                .button_label(tr("Restart"))
+                .timeout(0)
+                .build();
+            toast.connect_button_clicked(|_| crate::restart());
+            d.add_toast(toast.clone());
+            pending.replace(Some(toast));
+        }
+    });
+    let lang_group = adw::PreferencesGroup::new();
+    lang_group.add(&language);
+    page.add(&lang_group);
 
     let folders = adw::PreferencesGroup::builder()
         .title(tr("AppImage Folders"))

@@ -41,7 +41,8 @@ each one came from, and a safe way to remove it.
 - **Manual marks**: "hide from the list" and "show as an application" are remembered.
 - **Unneeded components** after removal: AppReestr offers to clean up what nothing needs any more.
 - **No network, no telemetry.** Browsing needs no administrator rights.
-- Fully keyboard-driven, follows the system light/dark theme, available in English and Russian.
+- Fully keyboard-driven, follows the system light/dark theme, available in English (default) and Russian. The
+  language is chosen in Preferences and applies after a restart.
 
 ## Build and install
 

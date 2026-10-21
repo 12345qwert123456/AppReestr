@@ -82,6 +82,7 @@ The scan takes about 0.4 s in release. The UI shows `cache.rs`'s snapshot (postc
 
 ## i18n
 
+- The UI language is a setting (`Settings::language`, English by default, picked in Preferences). `i18n::init(localedir, language)` runs in `main` before GTK: it sets `LC_ALL` to an installed locale of that language (else `C.UTF-8`) and `LANGUAGE`, so GTK/libadwaita strings and dates follow the same language as ours. `i18n::available` lists English plus every `<localedir>/<lang>/LC_MESSAGES/appreestr.mo`, so a new language is only `po/<lang>.po` + a line in `po/LINGUAS`; autonyms for the picker are a small table in `i18n.rs` (unlisted codes show as the code). A change applies on restart (`main::restart` execs the binary again after the main loop ends).
 - Use `appreestr_core::i18n::{tr, trf, trn}` with English literals. `trf` substitutes `{}` in order. `trn` handles plurals; Russian has 3 forms.
 - Strings must be literals inside these calls for `tools/extract-strings.py` to find them. xgettext is not used because it chokes on Rust lifetimes.
 - After adding strings, run `make pot` and translate the new entries in `po/ru.po`: clear `#, fuzzy` and keep `msgfmt --check` clean.

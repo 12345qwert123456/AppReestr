@@ -96,6 +96,7 @@ pub enum Msg {
     Preferences,
     SetTheme(appreestr_core::config::Theme),
     SetTransparency(u8),
+    SetLanguage(String),
     SetAppImageDirs(Vec<String>),
     FocusSearch,
     ClearSearch,
@@ -993,6 +994,12 @@ impl Component for AppModel {
                 self.settings.transparency = v;
                 crate::theme::apply(&self.settings);
                 self.save_settings();
+            }
+            Msg::SetLanguage(code) => {
+                self.settings.language = code;
+                self.save_settings();
+                // Names and summaries in the snapshot are in the old language.
+                let _ = std::fs::remove_file(cache::snapshot_path(&self.sys.cache_home));
             }
             Msg::SetAppImageDirs(dirs) => {
                 self.settings.appimage_dirs = dirs;

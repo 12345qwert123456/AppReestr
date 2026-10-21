@@ -25,7 +25,7 @@ const PASS: &[&str] = &[
     "LC_MESSAGES",
 ];
 
-const NOTIFY_READY: &str = "--notify-ready";
+pub const NOTIFY_READY: &str = "--notify-ready";
 
 pub fn is_root() -> bool {
     nix::unistd::geteuid().is_root()
