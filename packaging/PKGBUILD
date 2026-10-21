@@ -1,14 +1,13 @@
 # Builds AppReestr from this source tree:  cd packaging && makepkg -si
-# For the AUR, replace the local source with the public git repository:
-#   https://github.com/12345qwert123456/AppReestr
+# This is for local builds only. The AUR packages are in packaging/aur/.
 
-pkgname=appreestr-git
+pkgname=appreestr-local
 _pkgname=appreestr
 pkgver=0.1.0
 pkgrel=1
 url="https://github.com/12345qwert123456/AppReestr"
 pkgdesc="Installed applications registry for Arch Linux: one list from all sources, safe removal"
-arch=('x86_64' 'aarch64')
+arch=('x86_64')
 license=('GPL-3.0-or-later')
 depends=('gtk4' 'libadwaita' 'pacman' 'polkit' 'glib2' 'gcc-libs' 'glibc')
 makedepends=('cargo' 'gettext')

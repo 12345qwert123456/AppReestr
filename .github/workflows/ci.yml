@@ -20,7 +20,32 @@ jobs:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed rust gtk4 libadwaita gettext desktop-file-utils appstream git
       - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
       - name: Format, lint, test, validate data files
         run: make check
       - name: Release build
         run: make build
+
+  pkgbuild:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed rust gtk4 libadwaita gettext git namcap sudo
+      - uses: actions/checkout@v7
+      - name: Prepare an unprivileged build user
+        run: |
+          useradd -m builder
+          chown -R builder: .
+          git config --global --add safe.directory '*'
+          sudo -u builder git config --global --add safe.directory '*'
+      - name: Build the package from this tree
+        run: sudo -u builder bash -c 'cd packaging && makepkg --noconfirm --nodeps -f'
+      - name: Lint the package
+        continue-on-error: true
+        run: namcap packaging/*.pkg.tar.zst
+      - name: AUR PKGBUILDs are well formed
+        run: |
+          for d in packaging/aur/*/; do
+            sudo -u builder bash -c "cd $d && makepkg --printsrcinfo >/dev/null"
+          done

@@ -1,0 +1,47 @@
+# Maintainer: AppReestr contributors <https://github.com/12345qwert123456/AppReestr>
+# Built from the release tarball that the "Release" workflow attaches to every tag.
+# The workflow bumps pkgver and the checksum and pushes this file to the AUR.
+
+pkgname=appreestr
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Installed applications registry for Arch Linux: one list from all sources, safe removal"
+arch=('x86_64')
+url="https://github.com/12345qwert123456/AppReestr"
+license=('GPL-3.0-or-later')
+depends=('gtk4' 'libadwaita' 'pacman' 'polkit' 'glib2' 'gcc-libs' 'glibc')
+makedepends=('cargo' 'gettext')
+optdepends=(
+  'flatpak: show and remove Flatpak applications'
+  'snapd: show and remove Snap packages'
+  'curl: optional check for new versions'
+  'xdg-desktop-portal-gtk: follow the system light/dark style on window managers'
+)
+options=('!lto')
+source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  make build PREFIX=/usr
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  cargo test --workspace --locked --release
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  make install PREFIX=/usr DESTDIR="$pkgdir" TARGET="$srcdir/target"
+}

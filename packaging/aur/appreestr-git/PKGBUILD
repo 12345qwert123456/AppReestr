@@ -1,0 +1,59 @@
+# Maintainer: AppReestr contributors <https://github.com/12345qwert123456/AppReestr>
+# Development version, built from the main branch.
+
+pkgname=appreestr-git
+_pkgname=appreestr
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Installed applications registry for Arch Linux: one list from all sources, safe removal (git version)"
+arch=('x86_64')
+url="https://github.com/12345qwert123456/AppReestr"
+license=('GPL-3.0-or-later')
+depends=('gtk4' 'libadwaita' 'pacman' 'polkit' 'glib2' 'gcc-libs' 'glibc')
+makedepends=('cargo' 'gettext' 'git')
+optdepends=(
+  'flatpak: show and remove Flatpak applications'
+  'snapd: show and remove Snap packages'
+  'curl: optional check for new versions'
+  'xdg-desktop-portal-gtk: follow the system light/dark style on window managers'
+)
+provides=("$_pkgname=$pkgver")
+conflicts=("$_pkgname")
+options=('!lto')
+source=("git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd AppReestr
+  # <version>.r<commits since the last tag>.g<hash>; before the first tag, count all commits.
+  if git describe --long --tags --match 'v*' >/dev/null 2>&1; then
+    git describe --long --tags --match 'v*' | sed 's/^v//; s/-\([0-9]*\)-g/.r\1.g/'
+  else
+    printf "0.1.0.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  fi
+}
+
+prepare() {
+  cd AppReestr
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd AppReestr
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  make build PREFIX=/usr
+}
+
+check() {
+  cd AppReestr
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  cargo test --workspace --locked --release
+}
+
+package() {
+  cd AppReestr
+  make install PREFIX=/usr DESTDIR="$pkgdir" TARGET="$srcdir/target"
+}
