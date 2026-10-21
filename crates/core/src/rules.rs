@@ -15,6 +15,7 @@ pub struct ClassifyRules {
     pub system_packages: Vec<String>,
     pub system_desktop_ids: Vec<String>,
     pub system_name_patterns: Vec<String>,
+    pub system_name_patterns_weak: Vec<String>,
     pub system_groups: Vec<String>,
 }
 
@@ -71,6 +72,7 @@ impl Rules {
                 c.system_packages.extend(user.classify.system_packages);
                 c.system_desktop_ids.extend(user.classify.system_desktop_ids);
                 c.system_name_patterns.extend(user.classify.system_name_patterns);
+                c.system_name_patterns_weak.extend(user.classify.system_name_patterns_weak);
                 c.system_groups.extend(user.classify.system_groups);
                 rules.protect.critical.extend(user.critical);
             }

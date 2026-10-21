@@ -62,6 +62,7 @@ pub enum Msg {
     Sort(SortKey),
     ShowSystem(bool),
     ShowConsole(bool),
+    ShowAddons(bool),
     Refresh,
     Activate(u32),
     Details(String),
@@ -164,6 +165,7 @@ impl AppModel {
     fn save_settings(&mut self) {
         self.settings.show_system = self.query.show_system;
         self.settings.show_console = self.query.show_console;
+        self.settings.show_addons = self.query.show_addons;
         self.settings.sort = self.query.sort;
         if let Err(e) = self.store.save_settings(&self.settings) {
             tracing::warn!("saving settings: {e}");
@@ -198,9 +200,8 @@ impl AppModel {
             self.visible.iter().map(|&i| AppRow { app: self.apps[i].clone(), select: select.clone() }),
         );
 
-        let counts = listing::counts(&self.apps, self.query.show_system, self.query.show_console);
-        let total: usize =
-            self.apps.iter().filter(|a| a.is_listed(self.query.show_system, self.query.show_console)).count();
+        let counts = listing::counts(&self.apps, self.query.shown());
+        let total: usize = self.apps.iter().filter(|a| a.is_listed(self.query.shown())).count();
         for (f, chip) in &w.chips {
             let (label, n) = match f {
                 None => (tr("All"), total),
@@ -283,6 +284,12 @@ impl AppModel {
                 tr("Only applications are shown. Command-line tools are hidden."),
                 Some((tr("Show Command-Line Tools"), "win.show-console")),
             )
+        } else if !self.query.show_addons {
+            (
+                tr("Nothing Found"),
+                tr("Only applications are shown. Add-ons are hidden."),
+                Some((tr("Show Add-ons"), "win.show-addons")),
+            )
         } else {
             (tr("Nothing Found"), tr("No installed applications were found."), None)
         };
@@ -303,6 +310,7 @@ impl AppModel {
         };
         set("show-system", self.query.show_system.to_variant());
         set("show-console", self.query.show_console.to_variant());
+        set("show-addons", self.query.show_addons.to_variant());
         set("sort", sort_name(self.query.sort).to_variant());
     }
 
@@ -406,6 +414,7 @@ fn build_actions(sender: &ComponentSender<AppModel>, q: &ListQuery) -> gio::Simp
     };
     toggle("show-system", q.show_system, Msg::ShowSystem);
     toggle("show-console", q.show_console, Msg::ShowConsole);
+    toggle("show-addons", q.show_addons, Msg::ShowAddons);
 
     let sort = gio::SimpleAction::new_stateful("sort", Some(glib::VariantTy::STRING), &sort_name(q.sort).to_variant());
     let s = sender.clone();
@@ -447,6 +456,7 @@ fn set_accels() {
         ("win.refresh", &["F5", "<Ctrl>r"]),
         ("win.show-system", &["<Ctrl>h"]),
         ("win.show-console", &["<Ctrl>j"]),
+        ("win.show-addons", &["<Ctrl>k"]),
         ("win.shortcuts", &["<Ctrl>question"]),
         ("win.preferences", &["<Ctrl>comma"]),
         ("win.back", &["<Alt>Left"]),
@@ -465,6 +475,7 @@ fn main_menu() -> gio::Menu {
     let view = gio::Menu::new();
     view.append(Some(&tr("Show System Components")), Some("win.show-system"));
     view.append(Some(&tr("Show Command-Line Tools")), Some("win.show-console"));
+    view.append(Some(&tr("Show Add-ons")), Some("win.show-addons"));
     menu.append_section(None, &view);
     let other = gio::Menu::new();
     other.append(Some(&tr("Refresh")), Some("win.refresh"));
@@ -525,6 +536,7 @@ impl Component for AppModel {
         let query = ListQuery {
             show_system: settings.show_system,
             show_console: settings.show_console,
+            show_addons: settings.show_addons,
             sort: settings.sort,
             ..Default::default()
         };
@@ -795,6 +807,11 @@ impl Component for AppModel {
             }
             Msg::ShowConsole(v) => {
                 self.query.show_console = v;
+                self.save_settings();
+                self.refresh_list(w);
+            }
+            Msg::ShowAddons(v) => {
+                self.query.show_addons = v;
                 self.save_settings();
                 self.refresh_list(w);
             }

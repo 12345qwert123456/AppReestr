@@ -1,7 +1,7 @@
 //! Search, filter and sort for the list view (kept here so it is testable without a GUI).
 
 use crate::config::SortKey;
-use crate::model::{App, SourceFilter};
+use crate::model::{App, Shown, SourceFilter};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
@@ -11,8 +11,15 @@ pub struct ListQuery {
     pub filter: Option<SourceFilter>,
     pub show_system: bool,
     pub show_console: bool,
+    pub show_addons: bool,
     pub sort: SortKey,
     pub descending: bool,
+}
+
+impl ListQuery {
+    pub fn shown(&self) -> Shown {
+        Shown { system: self.show_system, console: self.show_console, addons: self.show_addons }
+    }
 }
 
 fn source_rank(a: &App) -> SourceFilter {
@@ -36,7 +43,7 @@ pub fn select<T: AsRef<App>>(apps: &[T], q: &ListQuery) -> Vec<usize> {
         .iter()
         .map(AsRef::as_ref)
         .enumerate()
-        .filter(|(_, a)| a.is_listed(q.show_system, q.show_console))
+        .filter(|(_, a)| a.is_listed(q.shown()))
         .filter(|(_, a)| q.filter.is_none_or(|f| a.filters().contains(&f)))
         .filter(|(_, a)| a.matches_query(q.text.trim()))
         .map(|(i, _)| i)
@@ -49,9 +56,9 @@ pub fn select<T: AsRef<App>>(apps: &[T], q: &ListQuery) -> Vec<usize> {
 }
 
 /// How many listed apps each source filter would show (ignoring the text and the filter).
-pub fn counts<T: AsRef<App>>(apps: &[T], show_system: bool, show_console: bool) -> BTreeMap<SourceFilter, usize> {
+pub fn counts<T: AsRef<App>>(apps: &[T], shown: Shown) -> BTreeMap<SourceFilter, usize> {
     let mut m = BTreeMap::new();
-    for a in apps.iter().map(AsRef::as_ref).filter(|a| a.is_listed(show_system, show_console)) {
+    for a in apps.iter().map(AsRef::as_ref).filter(|a| a.is_listed(shown)) {
         for f in a.filters() {
             *m.entry(f).or_insert(0) += 1;
         }
@@ -86,6 +93,7 @@ mod tests {
             app("zeta", 10, Visibility::App, repo.clone()),
             app("Alpha", 30, Visibility::App, Source::AppImage),
             app("ripgrep", 5, Visibility::Console, repo.clone()),
+            app("incus-ui", 4, Visibility::Addon, repo.clone()),
             app("glibc", 50, Visibility::System, repo),
         ];
         let mut q = ListQuery::default();
@@ -98,7 +106,11 @@ mod tests {
         q.filter = None;
         q.text = "RIP".into();
         assert_eq!(select(&apps, &q), vec![2]);
-        let c = counts(&apps, true, true);
-        assert_eq!(c[&SourceFilter::Official], 3);
+        q.text.clear();
+        q.show_addons = true;
+        assert_eq!(select(&apps, &q), vec![1, 0, 2, 3]);
+        let all = Shown { system: true, console: true, addons: true };
+        assert_eq!(counts(&apps, all)[&SourceFilter::Official], 4);
+        assert_eq!(counts(&apps, Shown::default())[&SourceFilter::Official], 1);
     }
 }

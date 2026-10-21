@@ -293,6 +293,9 @@ pub enum Visibility {
     App,
     /// Command-line tool installed by the user; behind the "console" toggle.
     Console,
+    /// Something the user installed that has no program of its own (plugin, dictionary,
+    /// web UI, driver data); behind the "add-ons" toggle.
+    Addon,
     /// Libraries, services, drivers…; behind the "system" toggle.
     System,
 }
@@ -325,6 +328,7 @@ pub enum Reason {
     NamePattern(String),
     BaseGroup,
     Service,
+    AddOn,
     Kernel,
     NoExecutables,
     FlatpakApp,
@@ -334,6 +338,14 @@ pub enum Reason {
     SnapBase,
     ManualInstall,
     ShortcutOf(ShortcutKind),
+}
+
+/// Which groups besides applications the list currently includes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Shown {
+    pub system: bool,
+    pub console: bool,
+    pub addons: bool,
 }
 
 /// One row of the list: an application possibly installed in several ways.
@@ -383,14 +395,15 @@ impl App {
     }
 
     /// Shown in the list with the current toggles.
-    pub fn is_listed(&self, show_system: bool, show_console: bool) -> bool {
+    pub fn is_listed(&self, shown: Shown) -> bool {
         if self.user_mark == Some(UserMark::Hidden) {
-            return show_system;
+            return shown.system;
         }
         match self.visibility {
             Visibility::App => true,
-            Visibility::Console => show_console,
-            Visibility::System => show_system,
+            Visibility::Console => shown.console,
+            Visibility::Addon => shown.addons,
+            Visibility::System => shown.system,
         }
     }
 

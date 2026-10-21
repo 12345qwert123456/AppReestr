@@ -82,9 +82,12 @@ fn main() {
         }
         println!();
     }
-    for (vis, title) in
-        [(Visibility::App, "APPLICATIONS"), (Visibility::Console, "CONSOLE"), (Visibility::System, "SYSTEM")]
-    {
+    for (vis, title) in [
+        (Visibility::App, "APPLICATIONS"),
+        (Visibility::Console, "CONSOLE"),
+        (Visibility::Addon, "ADD-ONS"),
+        (Visibility::System, "SYSTEM"),
+    ] {
         let apps: Vec<&App> = res.apps.iter().filter(|a| a.visibility == vis).collect();
         println!("== {title} ({})", apps.len());
         if vis != Visibility::App && !has("--all") {

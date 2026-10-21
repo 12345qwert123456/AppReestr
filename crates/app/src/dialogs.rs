@@ -34,6 +34,7 @@ pub fn shortcuts(parent: &adw::ApplicationWindow) {
             vec![
                 (tr("Show system components"), "<Ctrl>h"),
                 (tr("Show command-line tools"), "<Ctrl>j"),
+                (tr("Show add-ons"), "<Ctrl>k"),
                 (tr("All sources"), "<Alt>1"),
                 (tr("Filter by source"), "<Alt>2"),
             ],

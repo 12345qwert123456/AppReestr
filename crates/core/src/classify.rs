@@ -114,17 +114,37 @@ pub fn classify(unit: &Installation, ctx: &Context) -> (Visibility, Vec<Reason>)
     if let Some(p) = any_glob(&rules.system_name_patterns, name) {
         return system(reasons, Reason::NamePattern(p));
     }
+    // What the user installed after the OS was set up: asked for by name, or kept after the
+    // package was marked as a dependency (`pacman -D --asdeps`) while nothing else needs it.
+    let by_user = !pkg.installed_with_system;
+    let asked_for = pkg.explicit && by_user;
+    let kept_orphan = !pkg.explicit && by_user && pkg.required_by.is_empty() && !pkg.binaries.is_empty();
+    if !(asked_for && !pkg.binaries.is_empty())
+        && let Some(p) = any_glob(&rules.system_name_patterns_weak, name)
+    {
+        return system(reasons, Reason::NamePattern(p));
+    }
+    if kept_orphan {
+        reasons.push(Reason::LeftoverDependency);
+        reasons.push(Reason::CommandLineTools(pkg.binaries.iter().take(5).cloned().collect()));
+        return (Console, reasons);
+    }
     if !pkg.explicit {
         return system(reasons, Reason::InstalledAsDependency(pkg.required_by.clone()));
     }
     if pkg.binaries.is_empty() {
+        if asked_for && !pkg.is_meta && pkg.file_count > 0 {
+            reasons.push(Reason::AddOn);
+            return (Addon, reasons);
+        }
         return system(reasons, Reason::NoExecutables);
     }
     if pkg.installed_with_system {
         return system(reasons, Reason::InstalledWithSystem);
     }
+    // A daemon the user installed (incus, podman…) is still their choice: note it, keep it listed.
     if pkg.has_services {
-        return system(reasons, Reason::Service);
+        reasons.push(Reason::Service);
     }
     if unit.metainfo.as_ref().is_some_and(|m| m.kind == ComponentKind::ConsoleApplication) {
         reasons.push(Reason::MetainfoConsoleApp);
@@ -185,8 +205,61 @@ mod tests {
         assert_eq!(run(&pkg("libva-utils", true, false, |_| {}), &[]), Visibility::System);
         assert_eq!(run(&pkg("sudo", true, false, |f| f.groups = vec!["base".into()]), &[]), Visibility::System);
         assert_eq!(run(&pkg("nano", true, false, |f| f.installed_with_system = true), &[]), Visibility::System);
-        assert_eq!(run(&pkg("glibc", false, false, |_| {}), &[]), Visibility::System);
+        assert_eq!(run(&pkg("glibc", false, false, |f| f.required_by = vec!["bash".into()]), &[]), Visibility::System);
         assert_eq!(run(&pkg("linux-zen", true, false, |f| f.has_kernel = true), &[]), Visibility::System);
+    }
+
+    #[test]
+    fn installed_by_the_user() {
+        // A daemon installed by hand is a tool, not system plumbing.
+        let incus = pkg("incus", true, false, |f| f.has_services = true);
+        let (vis, reasons) = classify(&incus, &Context { rules: &Rules::bundled(), sets: &HashSet::new() });
+        assert_eq!(vis, Visibility::Console);
+        assert!(reasons.contains(&Reason::Service));
+        // Weak name patterns only apply to what the user did not ask for.
+        assert_eq!(run(&pkg("python-pip", true, false, |_| {}), &[]), Visibility::Console);
+        assert_eq!(
+            run(&pkg("python-requests", false, false, |f| f.required_by = vec!["x".into()]), &[]),
+            Visibility::System
+        );
+        assert_eq!(run(&pkg("python-pip", true, false, |f| f.installed_with_system = true), &[]), Visibility::System);
+        assert_eq!(run(&pkg("libhandy", true, false, |_| {}), &[]), Visibility::System);
+        // Marked --asdeps later, but nothing needs it.
+        assert_eq!(run(&pkg("tmux", false, false, |_| {}), &[]), Visibility::Console);
+        assert_eq!(run(&pkg("tmux", false, false, |f| f.installed_with_system = true), &[]), Visibility::System);
+        assert_eq!(run(&pkg("tmux", false, false, |f| f.required_by = vec!["x".into()]), &[]), Visibility::System);
+        assert_eq!(run(&pkg("lib-data", false, false, |f| f.binaries.clear()), &[]), Visibility::System);
+    }
+
+    #[test]
+    fn addons() {
+        let none = |f: &mut PkgFacts| f.binaries.clear();
+        assert_eq!(run(&pkg("incus-ui", true, false, none), &[]), Visibility::Addon);
+        assert_eq!(run(&pkg("hunspell-ru", true, false, none), &[]), Visibility::Addon);
+        // Installed with the OS, a meta package, a library or a dependency are not add-ons.
+        assert_eq!(
+            run(
+                &pkg("hunspell-en_us", true, false, |f| {
+                    f.binaries.clear();
+                    f.installed_with_system = true
+                }),
+                &[]
+            ),
+            Visibility::System
+        );
+        assert_eq!(run(&pkg("some-meta", true, false, none), &[]), Visibility::System);
+        assert_eq!(
+            run(
+                &pkg("gaming-set", true, false, |f| {
+                    f.binaries.clear();
+                    f.is_meta = true
+                }),
+                &[]
+            ),
+            Visibility::System
+        );
+        assert_eq!(run(&pkg("libfoo", true, false, none), &[]), Visibility::System);
+        assert_eq!(run(&pkg("dep-data", false, false, none), &[]), Visibility::System);
     }
 
     #[test]
@@ -194,7 +267,10 @@ mod tests {
         let mut u = pkg("avahi", true, true, |_| {});
         u.desktop_entries[0].id = "avahi-discover.desktop".into();
         assert_eq!(run(&u, &[]), Visibility::Console);
-        let mut hidden = pkg("helper", true, true, |f| f.binaries.clear());
+        let mut hidden = pkg("helper", true, true, |f| {
+            f.binaries.clear();
+            f.installed_with_system = true;
+        });
         hidden.desktop_entries[0].no_display = true;
         assert_eq!(run(&hidden, &[]), Visibility::System);
     }

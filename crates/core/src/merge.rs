@@ -239,6 +239,6 @@ mod tests {
         marks.insert("x:gimp".to_string(), UserMark::Hidden);
         let apps = merge(vec![unit(repo(), "gimp", "gimp.desktop", "GIMP")], &marks);
         assert_eq!(apps[0].user_mark, Some(UserMark::Hidden));
-        assert!(!apps[0].is_listed(false, false));
+        assert!(!apps[0].is_listed(crate::model::Shown::default()));
     }
 }

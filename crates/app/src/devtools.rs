@@ -21,6 +21,7 @@ pub fn on_first_scan(root: &adw::ApplicationWindow, sender: &ComponentSender<App
             "uninstall" => sender.input(Msg::Uninstall(arg.to_string())),
             "system" => sender.input(Msg::ShowSystem(true)),
             "console" => sender.input(Msg::ShowConsole(true)),
+            "addons" => sender.input(Msg::ShowAddons(true)),
             "preferences" => sender.input(Msg::Preferences),
             "select" => {
                 sender.input(Msg::SelectApps(arg.split(',').filter(|s| !s.is_empty()).map(String::from).collect()))

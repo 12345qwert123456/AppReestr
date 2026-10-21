@@ -33,6 +33,7 @@ pub fn describe(r: &Reason) -> String {
         Reason::NamePattern(p) => trf("System component by name ({})", &[p]),
         Reason::BaseGroup => tr("Part of the base system"),
         Reason::Service => tr("Background service"),
+        Reason::AddOn => tr("Extra component you installed: plugin, dictionary, driver or data"),
         Reason::Kernel => tr("Linux kernel"),
         Reason::NoExecutables => tr("Has no programs to run (library or data)"),
         Reason::FlatpakApp => tr("Flatpak application"),

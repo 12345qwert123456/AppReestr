@@ -30,6 +30,7 @@ pub enum Theme {
 pub struct Settings {
     pub show_system: bool,
     pub show_console: bool,
+    pub show_addons: bool,
     pub sort: SortKey,
     pub sort_descending: bool,
     pub theme: Theme,
@@ -44,6 +45,7 @@ impl Default for Settings {
         Self {
             show_system: false,
             show_console: false,
+            show_addons: false,
             sort: SortKey::Name,
             sort_descending: false,
             theme: Theme::System,

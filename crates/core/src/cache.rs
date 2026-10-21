@@ -5,7 +5,7 @@ use crate::sysroot::as_user;
 use std::path::{Path, PathBuf};
 
 /// Bump when the model changes incompatibly.
-const MAGIC: &[u8; 12] = b"APPREESTR\x00\x00\x03";
+const MAGIC: &[u8; 12] = b"APPREESTR\x00\x00\x04";
 
 pub fn snapshot_path(cache_home: &Path) -> PathBuf {
     cache_home.join("appreestr/snapshot.bin")

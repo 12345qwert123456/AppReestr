@@ -25,7 +25,8 @@ fn fallback(app: &App) -> &'static str {
     match app.visibility {
         Visibility::App => "application-x-executable",
         Visibility::Console => "utilities-terminal",
-        Visibility::System => "application-x-addon",
+        Visibility::Addon => "application-x-addon",
+        Visibility::System => "applications-system-symbolic",
     }
 }
 
